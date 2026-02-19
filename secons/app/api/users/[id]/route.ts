@@ -5,6 +5,19 @@ import { verifyAndDecodeToken, deleteFirebaseUser } from "@/lib/firebase-admin";
 import { logAuth } from "@/lib/audit-logger";
 import type { ApiResponse } from "@/types/api";
 import type { UserRole } from "@/types/auth";
+import { deleteImage } from "@/lib/cloudinary";
+
+// Clean up all uploaded files for a user (avatars, flyers, etc.)
+// Clean up all uploaded files for a user (avatars, flyers, etc.)
+async function cleanupUserFiles(uid: string) {
+    try {
+        // Delete avatar from Cloudinary
+        // Public ID is formatted as: secons/avatars/{uid}
+        await deleteImage(`secons/avatars/${uid}`);
+    } catch (error) {
+        console.error("Failed to cleanup user files:", error);
+    }
+}
 
 // ============================================================
 // GET /api/users/[id] — Get single user
@@ -72,7 +85,7 @@ export async function GET(
 }
 
 // ============================================================
-// DELETE /api/users/[id] — Deactivate user (GA only)
+// DELETE /api/users/[id] — Deactivate user (GA only, or self-delete)
 // ============================================================
 export async function DELETE(
     req: NextRequest,
@@ -121,8 +134,11 @@ export async function DELETE(
             console.error("Failed to delete Firebase user:", fbErr);
         }
 
+        // Clean up uploaded files (avatars, flyers, etc.)
+        await cleanupUserFiles(targetUser.uid);
+
         const actor = await User.findOne({ uid: decoded.uid }).lean();
-        await logAuth("USER_LOGIN", "CRITICAL", actor ? String(actor._id) : decoded.uid, {
+        await logAuth("USER_DEACTIVATED", "CRITICAL", actor ? String(actor._id) : decoded.uid, {
             action: isSelfDelete ? "SELF_DELETE" : "USER_DEACTIVATED",
             targetUserId: id,
             targetEmail: targetUser.email,

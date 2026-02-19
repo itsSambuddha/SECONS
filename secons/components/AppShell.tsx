@@ -3,6 +3,7 @@
 import { useState, useEffect, createContext, useContext } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAuth } from "@/hooks/useAuth";
 
 // ============================================================
 // Context
@@ -157,6 +158,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
     const pathname = usePathname();
+    const { user } = useAuth();
+
+    const userInitial = user?.name?.charAt(0)?.toUpperCase() || "U";
 
     useEffect(() => {
         const checkMobile = () => setIsMobile(window.innerWidth < 1024);
@@ -344,21 +348,33 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                         {/* Spacer */}
                         <div style={{ flex: 1 }} />
 
-                        {/* Placeholder user avatar */}
-                        <div
-                            style={{
-                                width: "36px",
-                                height: "36px",
-                                borderRadius: "50%",
-                                background: "linear-gradient(135deg, #1A3C6E, #2A5494)",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                cursor: "pointer",
-                            }}
-                        >
-                            <span style={{ color: "white", fontSize: "14px", fontWeight: 700 }}>U</span>
-                        </div>
+                        {/* User avatar */}
+                        <Link href="/settings" style={{ textDecoration: "none" }}>
+                            <div
+                                style={{
+                                    width: "36px",
+                                    height: "36px",
+                                    borderRadius: "50%",
+                                    background: user?.photoURL ? "transparent" : "linear-gradient(135deg, #1A3C6E, #2A5494)",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    cursor: "pointer",
+                                    overflow: "hidden",
+                                    border: user?.photoURL ? "2px solid #E8A020" : "none",
+                                }}
+                            >
+                                {user?.photoURL ? (
+                                    <img
+                                        src={user.photoURL}
+                                        alt={user.name || "Profile"}
+                                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                                    />
+                                ) : (
+                                    <span style={{ color: "white", fontSize: "14px", fontWeight: 700 }}>{userInitial}</span>
+                                )}
+                            </div>
+                        </Link>
                     </header>
 
                     {/* Page Content */}

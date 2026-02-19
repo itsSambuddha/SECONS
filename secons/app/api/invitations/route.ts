@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
-import bcrypt from "bcryptjs";
 import { connectDB } from "@/lib/db";
 import InvitationToken from "@/models/InvitationToken";
 import User from "@/models/User";
@@ -10,6 +9,16 @@ import { hasAuthority, type UserRole } from "@/types/auth";
 import { authRateLimit } from "@/lib/rate-limiter";
 import { logAuth } from "@/lib/audit-logger";
 import type { ApiResponse } from "@/types/api";
+
+// Helper to generate 6-char alphanumeric code
+function generateAccessCode(): string {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // Removed tricky chars like I, O, 0, 1
+    let result = "";
+    for (let i = 0; i < 6; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+}
 
 // ============================================================
 // POST /api/invitations — Create invitation
@@ -96,15 +105,17 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Generate token
-        const rawToken = crypto.randomBytes(32).toString("hex");
-        const tokenHash = await bcrypt.hash(rawToken, 10);
+        // Generate 6-char access code
+        let accessCode = generateAccessCode();
+        // Ensure uniqueness (simple check)
+        const codeExists = await InvitationToken.findOne({ token: accessCode, used: false });
+        if (codeExists) accessCode = generateAccessCode();
 
         // Get inviter user
         const inviter = await User.findOne({ uid: decoded.uid }).lean();
 
         const invitation = await InvitationToken.create({
-            tokenHash,
+            token: accessCode,
             email: email.toLowerCase().trim(),
             name: name.trim(),
             role: targetRole,
@@ -113,32 +124,34 @@ export async function POST(req: NextRequest) {
             expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000), // 48 hours
         });
 
-        // Send email
-        const acceptUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/invite/accept?token=${rawToken}&id=${invitation._id}`;
+        // Send email with both code and direct link
+        const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/login?code=${accessCode}`;
         try {
             await sendInvitationEmail(email, {
                 inviteeName: name,
                 role: targetRole,
                 domain: domain || "general",
                 inviterName: inviter?.name || "SECONS Admin",
-                acceptUrl,
+                acceptUrl: loginUrl,
+                accessCode: accessCode,
             });
         } catch (emailError) {
             console.error("Failed to send invitation email:", emailError);
-            // Don't fail the whole request if email fails — the token is still valid
         }
 
-        await logAuth("USER_LOGIN", "INFO", inviter ? String(inviter._id) : decoded.uid, {
+        await logAuth("USER_CREATED", "INFO", inviter ? String(inviter._id) : decoded.uid, {
             action: "INVITATION_SENT",
             targetEmail: email,
             targetRole,
+            code: accessCode,
         });
 
-        return NextResponse.json<ApiResponse<{ invitationId: string; acceptUrl: string }>>({
+        return NextResponse.json<ApiResponse<{ invitationId: string; accessCode: string; loginUrl: string }>>({
             success: true,
             data: {
                 invitationId: String(invitation._id),
-                acceptUrl,
+                accessCode: accessCode,
+                loginUrl: loginUrl,
             },
         }, { status: 201 });
     } catch (error) {
@@ -209,6 +222,7 @@ export async function GET(req: NextRequest) {
                     name: inv.name,
                     role: inv.role,
                     domain: inv.domain,
+                    token: inv.token, // Show the code in the list for admins
                     used: inv.used,
                     expiresAt: inv.expiresAt,
                     createdAt: inv.createdAt,

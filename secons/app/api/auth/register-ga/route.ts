@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import User from "@/models/User";
-import { createFirebaseUser, setCustomClaims } from "@/lib/firebase-admin";
+import { verifyAndDecodeToken, setCustomClaims } from "@/lib/firebase-admin";
 import { authRateLimit } from "@/lib/rate-limiter";
 import { logInfo } from "@/lib/audit-logger";
 import type { ApiResponse } from "@/types/api";
 
 // ============================================================
 // POST /api/auth/register-ga — Register as General Animator
-// Only works when no active GA exists
+// Only works when no active GA exists in the system
+// Expects Firebase ID Token from Google Auth in Authorization header
 // ============================================================
 export async function POST(req: NextRequest) {
     try {
@@ -22,20 +23,20 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        const body = await req.json();
-        const { name, email, password } = body;
-
-        // Validate input
-        if (!name || !email || !password) {
+        const authHeader = req.headers.get("authorization");
+        if (!authHeader?.startsWith("Bearer ")) {
             return NextResponse.json<ApiResponse<null>>(
-                { success: false, error: "Name, email, and password are required" },
-                { status: 400 }
+                { success: false, error: "Authentication required" },
+                { status: 401 }
             );
         }
 
-        if (typeof password !== "string" || password.length < 8) {
+        const token = authHeader.split("Bearer ")[1];
+        const decodedToken = await verifyAndDecodeToken(token);
+
+        if (!decodedToken.email) {
             return NextResponse.json<ApiResponse<null>>(
-                { success: false, error: "Password must be at least 8 characters" },
+                { success: false, error: "Email missing from token" },
                 { status: 400 }
             );
         }
@@ -51,8 +52,8 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Check if email already used
-        const existingUser = await User.findOne({ email: email.toLowerCase() }).lean();
+        // Check if DB user already exists for this email
+        const existingUser = await User.findOne({ email: decodedToken.email.toLowerCase() }).lean();
         if (existingUser) {
             return NextResponse.json<ApiResponse<null>>(
                 { success: false, error: "An account with this email already exists" },
@@ -60,17 +61,14 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Create Firebase user
-        const firebaseUser = await createFirebaseUser(email, password, name);
-
         // Set custom claims
-        await setCustomClaims(firebaseUser.uid, { role: "ga", domain: "general" });
+        await setCustomClaims(decodedToken.uid, { role: "ga", domain: "general" });
 
         // Create MongoDB user
         const newUser = await User.create({
-            uid: firebaseUser.uid,
-            name: name.trim(),
-            email: email.toLowerCase().trim(),
+            uid: decodedToken.uid,
+            name: decodedToken.name || "General Animator",
+            email: decodedToken.email.toLowerCase().trim(),
             role: "ga",
             domain: "general",
             isActive: true,
@@ -81,26 +79,17 @@ export async function POST(req: NextRequest) {
 
         await logInfo("USER_CREATED", String(newUser._id), {
             action: "GA_REGISTRATION",
-            email: email.toLowerCase(),
+            email: decodedToken.email,
         });
 
         return NextResponse.json<ApiResponse<{ uid: string; role: string }>>({
             success: true,
-            data: { uid: firebaseUser.uid, role: "ga" },
+            data: { uid: decodedToken.uid, role: "ga" },
         }, { status: 201 });
     } catch (error) {
         console.error("POST /api/auth/register-ga error:", error);
-
-        const message = (error as Error).message;
-        if (message.includes("email-already-exists")) {
-            return NextResponse.json<ApiResponse<null>>(
-                { success: false, error: "This email is already registered in Firebase" },
-                { status: 409 }
-            );
-        }
-
         return NextResponse.json<ApiResponse<null>>(
-            { success: false, error: "Internal server error" },
+            { success: false, error: (error as Error).message || "Internal server error" },
             { status: 500 }
         );
     }

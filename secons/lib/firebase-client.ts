@@ -1,8 +1,9 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import {
     getAuth,
-    signInWithEmailAndPassword,
     signOut as firebaseSignOut,
+    signInWithPopup,
+    GoogleAuthProvider,
     type Auth,
     type User,
 } from "firebase/auth";
@@ -33,11 +34,13 @@ if (typeof window !== "undefined") {
     auth = getAuth(app);
 }
 
-// Sign in with email and password
-export async function signIn(email: string, password: string) {
+// Sign in with Google
+export async function signInWithGoogle() {
     const authInstance = getAuth(getFirebaseApp());
-    const credential = await signInWithEmailAndPassword(authInstance, email, password);
-    return credential.user;
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
+    const result = await signInWithPopup(authInstance, provider);
+    return result.user;
 }
 
 // Sign out

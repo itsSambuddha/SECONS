@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useRole } from "@/hooks/useRole";
@@ -26,8 +26,55 @@ export default function SettingsPage() {
     // Profile update
     const [name, setName] = useState(user?.name || "");
     const [photoURL, setPhotoURL] = useState(user?.photoURL || "");
+    const [photoPreview, setPhotoPreview] = useState(user?.photoURL || "");
+    const [uploading, setUploading] = useState(false);
+    const [uploadError, setUploadError] = useState("");
     const [saving, setSaving] = useState(false);
     const [saveMsg, setSaveMsg] = useState("");
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleFileSelect = async (file: File) => {
+        setUploadError("");
+
+        if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+            setUploadError("Only JPEG, PNG, and WebP images are allowed");
+            return;
+        }
+        if (file.size > 2 * 1024 * 1024) {
+            setUploadError("File size must be under 2MB");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => setPhotoPreview(e.target?.result as string);
+        reader.readAsDataURL(file);
+
+        setUploading(true);
+        try {
+            const token = await getToken();
+            const formData = new FormData();
+            formData.append("avatar", file);
+
+            const res = await fetch("/api/upload/avatar", {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}` },
+                body: formData,
+            });
+            const data = await res.json();
+            if (data.success) {
+                setPhotoURL(data.data.url);
+                setUploadError("");
+            } else {
+                setUploadError(data.error || "Upload failed");
+                setPhotoPreview(user?.photoURL || "");
+            }
+        } catch {
+            setUploadError("Upload failed. Please try again.");
+            setPhotoPreview(user?.photoURL || "");
+        } finally {
+            setUploading(false);
+        }
+    };
 
     const handleSaveProfile = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -103,6 +150,83 @@ export default function SettingsPage() {
                     Profile
                 </h2>
                 <form onSubmit={handleSaveProfile}>
+                    {/* Photo Upload */}
+                    <div style={{ marginBottom: "20px" }}>
+                        <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#1A1A2E", marginBottom: "10px" }}>
+                            Profile Photo
+                        </label>
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleFileSelect(file);
+                            }}
+                            style={{ display: "none" }}
+                        />
+                        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                            <div
+                                onClick={() => fileInputRef.current?.click()}
+                                style={{
+                                    width: "80px", height: "80px", borderRadius: "50%",
+                                    cursor: "pointer", overflow: "hidden", flexShrink: 0,
+                                    position: "relative",
+                                    border: photoPreview ? "3px solid #E8A020" : "3px dashed #CBD5E1",
+                                    background: photoPreview ? "transparent" : "#F8F9FB",
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                }}
+                            >
+                                {photoPreview ? (
+                                    <img
+                                        src={photoPreview}
+                                        alt="Profile"
+                                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                                    />
+                                ) : (
+                                    <span style={{ fontSize: "24px" }}>📷</span>
+                                )}
+                                {uploading && (
+                                    <div style={{
+                                        position: "absolute", inset: 0,
+                                        background: "rgba(255,255,255,0.8)",
+                                        display: "flex", alignItems: "center", justifyContent: "center",
+                                    }}>
+                                        <div style={{
+                                            width: "20px", height: "20px",
+                                            border: "3px solid #E2E8F0", borderTopColor: "#1A3C6E",
+                                            borderRadius: "50%", animation: "spin 0.8s linear infinite",
+                                        }} />
+                                        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                                    </div>
+                                )}
+                            </div>
+                            <div>
+                                <button
+                                    type="button"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    disabled={uploading}
+                                    style={{
+                                        padding: "6px 14px", borderRadius: "8px",
+                                        background: "#F8F9FB", border: "1px solid #E2E8F0",
+                                        color: "#1A1A2E", cursor: "pointer", fontSize: "13px",
+                                        fontWeight: 500,
+                                    }}
+                                >
+                                    {uploading ? "Uploading..." : "Change Photo"}
+                                </button>
+                                <p style={{ fontSize: "11px", color: "#9CA3AF", margin: "4px 0 0" }}>
+                                    JPEG, PNG, or WebP · Max 2MB
+                                </p>
+                                {uploadError && (
+                                    <p style={{ fontSize: "11px", color: "#DC2626", margin: "2px 0 0" }}>
+                                        {uploadError}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
                     <div style={{ marginBottom: "16px" }}>
                         <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#1A1A2E", marginBottom: "6px" }}>
                             Name
@@ -116,20 +240,7 @@ export default function SettingsPage() {
                             }}
                         />
                     </div>
-                    <div style={{ marginBottom: "16px" }}>
-                        <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#1A1A2E", marginBottom: "6px" }}>
-                            Photo URL
-                        </label>
-                        <input
-                            type="url" value={photoURL} onChange={(e) => setPhotoURL(e.target.value)}
-                            placeholder="https://..."
-                            style={{
-                                width: "100%", padding: "10px 14px", borderRadius: "10px",
-                                border: "1px solid #E2E8F0", fontSize: "14px", outline: "none",
-                                boxSizing: "border-box",
-                            }}
-                        />
-                    </div>
+
                     <div style={{
                         background: "#F8F9FB", borderRadius: "10px", padding: "12px 16px",
                         marginBottom: "16px", fontSize: "13px", color: "#6B7280",
@@ -170,7 +281,7 @@ export default function SettingsPage() {
                 </h2>
                 <p style={{ fontSize: "13px", color: "#6B7280", marginBottom: "16px", lineHeight: 1.6 }}>
                     {isGA
-                        ? "Deleting your account will remove your GA status. A new General Animator will be able to register after deletion. All your invitations and data associations will be preserved."
+                        ? "Deleting your account will remove your GA status. A new General Animator will be able to register after deletion."
                         : "Deleting your account will deactivate your access. This action cannot be undone."
                     }
                 </p>

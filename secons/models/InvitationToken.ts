@@ -5,7 +5,7 @@ import mongoose, { Schema, type Document } from "mongoose";
 // ============================================================
 
 export interface IInvitationToken extends Document {
-    tokenHash: string; // bcrypt hash of raw token
+    token: string; // 6-character alphanumeric code
     email: string;
     name: string;
     role: "jga" | "animator" | "volunteer" | "student";
@@ -18,7 +18,7 @@ export interface IInvitationToken extends Document {
 
 const invitationTokenSchema = new Schema<IInvitationToken>(
     {
-        tokenHash: { type: String, required: true },
+        token: { type: String, required: true, unique: true, uppercase: true },
         email: { type: String, required: true, lowercase: true, trim: true },
         name: { type: String, required: true, trim: true },
         role: {
@@ -40,6 +40,7 @@ const invitationTokenSchema = new Schema<IInvitationToken>(
 // TTL index: auto-delete after expiry + 24h grace period
 invitationTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 86400 });
 invitationTokenSchema.index({ email: 1, used: 1 });
+invitationTokenSchema.index({ token: 1 });
 
 export const InvitationToken =
     mongoose.models.InvitationToken ||

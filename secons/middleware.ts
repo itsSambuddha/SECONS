@@ -9,7 +9,6 @@ const publicRoutes = [
     "/",
     "/login",
     "/register",
-    "/invite/accept",
     "/events",
     "/leaderboard",
     "/calendar",
@@ -21,6 +20,10 @@ const publicRoutes = [
 // Routes that start with these prefixes are public
 const publicPrefixes = [
     "/api/health",
+    "/api/auth/ga-status",
+    "/api/auth/register-ga",
+    "/api/invitations/accept",
+    "/api/invitations/validate",
     "/_next",
     "/favicon.ico",
     "/images",

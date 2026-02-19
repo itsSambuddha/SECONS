@@ -1,118 +1,197 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
+import type { ApiResponse } from "@/types/api";
 
 // ============================================================
-// Login Page — also handles GA Registration
+// Login Page — Handles GA Registration & Invitation Gateway
 // ============================================================
-export default function LoginPage() {
+type LoginStep = "checking" | "ga-register" | "gateway" | "invite-ready" | "sign-in" | "unauthorized";
+
+function LoginForm() {
     const router = useRouter();
-    const { signIn, user, loading: authLoading } = useAuth();
+    const searchParams = useSearchParams();
+    const { signInWithGoogle, user, firebaseUser, loading: authLoading, getToken, signOut, refreshUser } = useAuth();
 
-    const [mode, setMode] = useState<"login" | "register-ga" | "checking">("checking");
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [name, setName] = useState("");
+    const [step, setStep] = useState<LoginStep>("checking");
+    const [accessCode, setAccessCode] = useState("");
+    const [inviteInfo, setInviteInfo] = useState<{ role: string; domain: string } | null>(null);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
-    const [showPassword, setShowPassword] = useState(false);
 
-    // Redirect if already logged in
+    // 1. Initial State Determination
     useEffect(() => {
-        if (!authLoading && user) {
-            router.replace(user.onboardingComplete ? "/dashboard" : "/onboarding");
-        }
-    }, [user, authLoading, router]);
-
-    // Check GA status
-    useEffect(() => {
-        async function checkGA() {
+        async function determineInitialState() {
             try {
+                // Check if GA exists
                 const res = await fetch("/api/auth/ga-status");
                 const data = await res.json();
-                setMode(data.data?.hasActiveGA ? "login" : "register-ga");
-            } catch {
-                setMode("login");
+                const hasGA = data.data?.hasActiveGA;
+
+                if (!hasGA) {
+                    setStep("ga-register");
+                } else {
+                    // If GA exists, check for code in URL
+                    const codeFromUrl = searchParams.get("code");
+                    if (codeFromUrl && codeFromUrl.length === 6) {
+                        setAccessCode(codeFromUrl);
+                        await validateCode(codeFromUrl);
+                    } else {
+                        setStep("gateway");
+                    }
+                }
+            } catch (err) {
+                setStep("gateway");
             }
         }
-        checkGA();
-    }, []);
+        determineInitialState();
+    }, [searchParams]);
 
-    const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
+    // 2. Redirect logic:
+    // - If has MongoDB profile -> Dashboard/Onboarding
+    // - If has Firebase User but NO profile -> Unauthorized state (unless registering)
+    useEffect(() => {
+        if (authLoading) return;
+
+        if (user) {
+            router.replace(user.onboardingComplete ? "/dashboard" : "/onboarding");
+        } else if (firebaseUser && step !== "ga-register" && step !== "invite-ready") {
+            // Signed in to Google, but no account in our system
+            setStep("unauthorized");
+        }
+    }, [user, firebaseUser, authLoading, router, step]);
+
+    // Validate 6-char access code
+    const validateCode = async (code: string) => {
         setError("");
         setLoading(true);
         try {
-            const profile = await signIn(email, password);
-            router.replace(profile.onboardingComplete ? "/dashboard" : "/onboarding");
-        } catch (err) {
-            const msg = (err as Error).message;
-            if (msg.includes("auth/invalid-credential") || msg.includes("auth/wrong-password")) {
-                setError("Invalid email or password");
-            } else if (msg.includes("auth/user-not-found")) {
-                setError("No account found with this email");
-            } else if (msg.includes("auth/too-many-requests")) {
-                setError("Too many attempts. Please try again later.");
+            const res = await fetch(`/api/invitations/validate?code=${code}`);
+            const data: ApiResponse<{ role: string; domain: string }> = await res.json();
+
+            if (data.success && data.data) {
+                setInviteInfo(data.data);
+                setStep("invite-ready");
             } else {
-                setError(msg || "Login failed");
+                setError(data.error || "Invalid or expired access code");
+                setStep("gateway");
             }
+        } catch (err) {
+            setError("Failed to validate code. Please try again.");
         } finally {
             setLoading(false);
         }
     };
 
-    const handleRegisterGA = async (e: React.FormEvent) => {
-        e.preventDefault();
+    // Handle GA Registration (First user)
+    const handleGARegistration = async () => {
         setError("");
-
-        if (password.length < 8) {
-            setError("Password must be at least 8 characters");
-            return;
-        }
-
         setLoading(true);
         try {
+            // 1. Sign in with Google to get UID/Email
+            await signInWithGoogle();
+            const token = await getToken();
+
+            // 2. Register role as GA in MongoDB
             const res = await fetch("/api/auth/register-ga", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name, email, password }),
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
             });
             const data = await res.json();
 
             if (!data.success) {
-                setError(data.error || "Registration failed");
+                setError(data.error || "GA Registration failed");
+                await signOut(); // Ensure clean state if registration fails
                 return;
             }
 
-            // Auto-login
-            await signIn(email, password);
+            // 3. IMPORTANT: Refresh user profile so AuthProvider sees the new MongoDB record
+            await refreshUser();
+
+            // Success -> Will be redirected by the useEffect, but we can also push
             router.replace("/onboarding");
         } catch (err) {
             setError((err as Error).message || "Registration failed");
+            await signOut();
         } finally {
             setLoading(false);
         }
     };
 
-    if (mode === "checking" || authLoading) {
+    // Handle Invitation Acceptance
+    const handleAcceptInvite = async () => {
+        setError("");
+        setLoading(true);
+        try {
+            // 1. Sign in with Google
+            await signInWithGoogle();
+            const firebaseToken = await getToken();
+
+            // 2. Accept invite in MongoDB
+            const res = await fetch("/api/invitations/accept", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${firebaseToken}`
+                },
+                body: JSON.stringify({ code: accessCode }),
+            });
+            const data = await res.json();
+
+            if (!data.success) {
+                setError(data.error || "Failed to accept invitation");
+                await signOut();
+                return;
+            }
+
+            // 3. Refresh user profile
+            await refreshUser();
+
+            router.replace("/onboarding");
+        } catch (err) {
+            setError((err as Error).message || "Acceptance failed");
+            await signOut();
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Handle Standard Sign-In (Existing User)
+    const handleSignIn = async () => {
+        setError("");
+        setLoading(true);
+        try {
+            await signInWithGoogle();
+            // User effect handles the rest.
+        } catch (err) {
+            setError("Google Sign-In failed");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (step === "checking" || (authLoading && !error)) {
         return (
-            <div style={{ textAlign: "center", color: "rgba(255,255,255,0.7)", padding: "60px 0" }}>
+            <div style={{ textAlign: "center", color: "rgba(255,255,255,0.7)", padding: "100px 0" }}>
                 <div style={{
                     width: "40px", height: "40px", border: "3px solid rgba(255,255,255,0.2)",
                     borderTopColor: "#E8A020", borderRadius: "50%", margin: "0 auto 16px",
                     animation: "spin 0.8s linear infinite",
                 }} />
                 <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-                <p>Loading...</p>
+                <p>Establishing secure connection...</p>
             </div>
         );
     }
 
     return (
-        <div>
-            {/* Logo */}
+        <div style={{ maxWidth: "400px", margin: "0 auto" }}>
+            {/* Logo Section */}
             <div style={{ textAlign: "center", marginBottom: "32px" }}>
                 <div style={{
                     width: "56px", height: "56px", borderRadius: "16px",
@@ -120,211 +199,246 @@ export default function LoginPage() {
                     display: "inline-flex", alignItems: "center", justifyContent: "center",
                     marginBottom: "16px", boxShadow: "0 8px 24px rgba(232, 160, 32, 0.3)",
                 }}>
-                    <span style={{ color: "#1A1A2E", fontSize: "24px", fontWeight: 900, fontFamily: "var(--font-display)" }}>S</span>
+                    <span style={{ color: "#1A1A2E", fontSize: "24px", fontWeight: 900 }}>S</span>
                 </div>
-                <h1 style={{
-                    fontFamily: "var(--font-display)", fontSize: "28px", fontWeight: 800,
-                    color: "white", margin: "0 0 4px",
-                }}>
-                    SECONS
-                </h1>
-                <p style={{ color: "rgba(255,255,255,0.6)", fontSize: "14px", margin: 0 }}>
-                    {mode === "register-ga"
-                        ? "No General Animator found. Register to get started."
-                        : "Sign in to your account"
-                    }
+                <h1 style={{ fontSize: "28px", fontWeight: 800, color: "white", margin: "0 0 4px" }}>SECONS</h1>
+                <p style={{ color: "rgba(255,255,255,0.6)", fontSize: "14px" }}>
+                    EdBlazon Authentication Gateway
                 </p>
             </div>
 
-            {/* Card */}
+            {/* Auth Card */}
             <div style={{
-                background: "white", borderRadius: "16px", padding: "32px",
-                boxShadow: "0 20px 60px rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)",
+                background: "white", borderRadius: "20px", padding: "32px",
+                boxShadow: "0 20px 60px rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.1)",
             }}>
-                {/* Mode toggle */}
-                {mode === "register-ga" && (
+
+                {/* Error Display */}
+                {error && (
                     <div style={{
-                        background: "#FEF6E8", border: "1px solid #F5C675", borderRadius: "10px",
-                        padding: "12px 16px", marginBottom: "24px", fontSize: "13px", color: "#8C6013",
+                        background: "#FEF2F2", color: "#DC2626", border: "1px solid #FCA5A5",
+                        borderRadius: "12px", padding: "12px 16px", marginBottom: "20px", fontSize: "13px"
                     }}>
-                        <strong>🎓 Become the General Animator</strong>
-                        <br />
-                        You&apos;ll have full control over SECONS — manage events, invite team members, and run EdBlazon.
+                        {error}
                     </div>
                 )}
 
-                <form onSubmit={mode === "register-ga" ? handleRegisterGA : handleLogin}>
-                    {/* Name (registration only) */}
-                    {mode === "register-ga" && (
+                {/* STEP: GA REGISTRATION */}
+                {step === "ga-register" && (
+                    <>
+                        <div style={{
+                            background: "#FEF6E8", border: "1px solid #F5C675", borderRadius: "12px",
+                            padding: "16px", marginBottom: "24px", fontSize: "13px", color: "#8C6013",
+                        }}>
+                            <strong>🎓 System Bootstrap</strong>
+                            <br />
+                            No General Animator found. As the first user, you will be registered with full system authority.
+                        </div>
+                        <button
+                            onClick={handleGARegistration}
+                            disabled={loading}
+                            style={buttonStyle(true)}
+                        >
+                            <GoogleIcon />
+                            {loading ? "Registering..." : "Sign in with Google"}
+                        </button>
+                    </>
+                )}
+
+                {/* STEP: ACCESS CODE ENTRY */}
+                {step === "gateway" && (
+                    <>
                         <div style={{ marginBottom: "20px" }}>
-                            <label style={{
-                                display: "block", fontSize: "13px", fontWeight: 600,
-                                color: "#1A1A2E", marginBottom: "6px",
-                            }}>
-                                Full Name
+                            <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "#1A1A2E", marginBottom: "8px" }}>
+                                Enter Access Code
                             </label>
                             <input
                                 type="text"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                placeholder="e.g. Sambuddha Chakraborty"
-                                required
-                                style={{
-                                    width: "100%", padding: "10px 14px", borderRadius: "10px",
-                                    border: "1px solid #E2E8F0", fontSize: "14px", outline: "none",
-                                    transition: "border-color 0.2s",
-                                    boxSizing: "border-box",
-                                }}
-                                onFocus={(e) => (e.target.style.borderColor = "#1A3C6E")}
-                                onBlur={(e) => (e.target.style.borderColor = "#E2E8F0")}
+                                maxLength={6}
+                                value={accessCode}
+                                onChange={(e) => setAccessCode(e.target.value.toUpperCase())}
+                                placeholder="6-CHAR CODE"
+                                style={inputStyle}
                             />
                         </div>
-                    )}
-
-                    {/* Email */}
-                    <div style={{ marginBottom: "20px" }}>
-                        <label style={{
-                            display: "block", fontSize: "13px", fontWeight: 600,
-                            color: "#1A1A2E", marginBottom: "6px",
-                        }}>
-                            Email Address
-                        </label>
-                        <input
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            placeholder="you@college.edu"
-                            required
-                            style={{
-                                width: "100%", padding: "10px 14px", borderRadius: "10px",
-                                border: "1px solid #E2E8F0", fontSize: "14px", outline: "none",
-                                transition: "border-color 0.2s",
-                                boxSizing: "border-box",
-                            }}
-                            onFocus={(e) => (e.target.style.borderColor = "#1A3C6E")}
-                            onBlur={(e) => (e.target.style.borderColor = "#E2E8F0")}
-                        />
-                    </div>
-
-                    {/* Password */}
-                    <div style={{ marginBottom: "24px" }}>
-                        <label style={{
-                            display: "block", fontSize: "13px", fontWeight: 600,
-                            color: "#1A1A2E", marginBottom: "6px",
-                        }}>
-                            Password
-                        </label>
-                        <div style={{ position: "relative" }}>
-                            <input
-                                type={showPassword ? "text" : "password"}
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                placeholder={mode === "register-ga" ? "Create a strong password (8+ chars)" : "Enter your password"}
-                                required
-                                minLength={mode === "register-ga" ? 8 : undefined}
-                                style={{
-                                    width: "100%", padding: "10px 44px 10px 14px", borderRadius: "10px",
-                                    border: "1px solid #E2E8F0", fontSize: "14px", outline: "none",
-                                    transition: "border-color 0.2s",
-                                    boxSizing: "border-box",
-                                }}
-                                onFocus={(e) => (e.target.style.borderColor = "#1A3C6E")}
-                                onBlur={(e) => (e.target.style.borderColor = "#E2E8F0")}
-                            />
-                            <button
-                                type="button"
-                                onClick={() => setShowPassword(!showPassword)}
-                                style={{
-                                    position: "absolute", right: "12px", top: "50%",
-                                    transform: "translateY(-50%)", background: "none",
-                                    border: "none", cursor: "pointer", color: "#6B7280",
-                                    fontSize: "13px", padding: "2px",
-                                }}
-                            >
-                                {showPassword ? "Hide" : "Show"}
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Error */}
-                    {error && (
-                        <div style={{
-                            background: "#FEE2E2", color: "#DC2626", borderRadius: "10px",
-                            padding: "10px 14px", marginBottom: "16px", fontSize: "13px",
-                            border: "1px solid #FECACA",
-                        }}>
-                            {error}
-                        </div>
-                    )}
-
-                    {/* Submit */}
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        style={{
-                            width: "100%", padding: "12px", borderRadius: "10px",
-                            background: loading
-                                ? "#94A3B8"
-                                : mode === "register-ga"
-                                    ? "linear-gradient(135deg, #E8A020 0%, #F0B84D 100%)"
-                                    : "linear-gradient(135deg, #1A3C6E 0%, #2A5494 100%)",
-                            color: mode === "register-ga" && !loading ? "#1A1A2E" : "white",
-                            border: "none", cursor: loading ? "not-allowed" : "pointer",
-                            fontSize: "15px", fontWeight: 700, fontFamily: "var(--font-display)",
-                            transition: "opacity 0.2s", opacity: loading ? 0.7 : 1,
-                        }}
-                    >
-                        {loading
-                            ? "Please wait..."
-                            : mode === "register-ga"
-                                ? "Register as General Animator"
-                                : "Sign In"
-                        }
-                    </button>
-                </form>
-
-                {/* Toggle mode link */}
-                {mode === "login" && (
-                    <p style={{
-                        textAlign: "center", marginTop: "20px", fontSize: "13px",
-                        color: "#6B7280",
-                    }}>
-                        Received an invitation?{" "}
-                        <a
-                            href="/invite/accept"
-                            style={{ color: "#1A3C6E", fontWeight: 600, textDecoration: "underline" }}
-                        >
-                            Accept here
-                        </a>
-                    </p>
-                )}
-
-                {mode === "register-ga" && (
-                    <p style={{
-                        textAlign: "center", marginTop: "20px", fontSize: "13px",
-                        color: "#6B7280",
-                    }}>
-                        Already have an account?{" "}
                         <button
-                            onClick={() => setMode("login")}
-                            style={{
-                                color: "#1A3C6E", fontWeight: 600, textDecoration: "underline",
-                                background: "none", border: "none", cursor: "pointer", fontSize: "13px",
-                            }}
+                            onClick={() => validateCode(accessCode)}
+                            disabled={loading || accessCode.length !== 6}
+                            style={buttonStyle(false)}
                         >
-                            Sign in
+                            {loading ? "Validating..." : "Verify Access Code"}
                         </button>
-                    </p>
+                        <p style={{ textAlign: "center", marginTop: "20px", fontSize: "13px", color: "#6B7280" }}>
+                            Already a member?{" "}
+                            <button onClick={() => setStep("sign-in")} style={linkButtonStyle}>Sign in directly</button>
+                        </p>
+                    </>
                 )}
+
+                {/* STEP: INVITE READY (Code Verified) */}
+                {step === "invite-ready" && inviteInfo && (
+                    <>
+                        <div style={{
+                            background: "#F0F9FF", border: "1px solid #BAE6FD", borderRadius: "12px",
+                            padding: "16px", marginBottom: "24px", fontSize: "14px", color: "#0369A1",
+                        }}>
+                            <strong>✅ Valid Invitation</strong>
+                            <br />
+                            Access code verified for <strong>{inviteInfo.role.toUpperCase()}</strong> role.
+                        </div>
+                        <button
+                            onClick={handleAcceptInvite}
+                            disabled={loading}
+                            style={buttonStyle(false)}
+                        >
+                            <GoogleIcon />
+                            {loading ? "Assigning Role..." : "Sign in with Google"}
+                        </button>
+                        <button
+                            onClick={() => setStep("gateway")}
+                            style={{ ...linkButtonStyle, display: "block", margin: "16px auto 0", fontSize: "12px" }}
+                        >
+                            Use a different code
+                        </button>
+                    </>
+                )}
+
+                {/* STEP: DIRECT SIGN IN */}
+                {step === "sign-in" && (
+                    <>
+                        <h2 style={{ fontSize: "18px", fontWeight: 700, textAlign: "center", marginBottom: "24px", color: "#1A1A2E" }}>
+                            Welcome Back
+                        </h2>
+                        <button
+                            onClick={handleSignIn}
+                            disabled={loading}
+                            style={buttonStyle(false)}
+                        >
+                            <GoogleIcon />
+                            {loading ? "Checking identity..." : "Sign in with Google"}
+                        </button>
+                        <p style={{ textAlign: "center", marginTop: "20px", fontSize: "13px", color: "#6B7280" }}>
+                            New here?{" "}
+                            <button onClick={() => setStep("gateway")} style={linkButtonStyle}>Enter access code</button>
+                        </p>
+                    </>
+                )}
+
+                {/* STEP: UNAUTHORIZED (Google Sign-In OK, but no DB profile) */}
+                {step === "unauthorized" && (
+                    <>
+                        <div style={{
+                            background: "#FEF2F2", border: "1px solid #FCA5A5", borderRadius: "12px",
+                            padding: "16px", marginBottom: "24px", fontSize: "13px", color: "#991B1B",
+                        }}>
+                            <strong>⛔ Access Denied</strong>
+                            <br />
+                            This Google account is not registered. Please use an invitation code to join SECONS.
+                        </div>
+                        <button
+                            onClick={async () => {
+                                await signOut();
+                                setStep("gateway");
+                            }}
+                            style={buttonStyle(false)}
+                        >
+                            Sign Out & Try Again
+                        </button>
+                    </>
+                )}
+
             </div>
 
-            {/* Footer */}
-            <p style={{
-                textAlign: "center", marginTop: "24px", fontSize: "12px",
-                color: "rgba(255,255,255,0.4)",
-            }}>
-                SECONS · EdBlazon Platform
+            {/* Platform Info */}
+            <p style={{ textAlign: "center", marginTop: "32px", fontSize: "12px", color: "rgba(255,255,255,0.4)" }}>
+                SECONS · Secure Access Protocol
             </p>
         </div>
     );
 }
+
+export default function LoginPage() {
+    return (
+        <Suspense fallback={
+            <div style={{ textAlign: "center", color: "rgba(255,255,255,0.7)", padding: "100px 0" }}>
+                <div style={{
+                    width: "40px", height: "40px", border: "3px solid rgba(255,255,255,0.2)",
+                    borderTopColor: "#E8A020", borderRadius: "50%", margin: "0 auto 16px",
+                    animation: "spin 0.8s linear infinite",
+                }} />
+                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                <p>Loading gateway...</p>
+            </div>
+        }>
+            <LoginForm />
+        </Suspense>
+    );
+}
+
+// Google Icon Component
+function GoogleIcon() {
+    return (
+        <span style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "white",
+            borderRadius: "50%",
+            width: "20px",
+            height: "20px",
+            marginRight: "10px",
+            verticalAlign: "middle"
+        }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.84z" fill="#FBBC05" />
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+            </svg>
+        </span>
+    );
+}
+
+// Styles
+const buttonStyle = (isGold: boolean) => ({
+    width: "100%",
+    padding: "12px",
+    borderRadius: "12px",
+    background: isGold
+        ? "linear-gradient(135deg, #E8A020 0%, #F0B84D 100%)"
+        : "linear-gradient(135deg, #1A3C6E 0%, #2A5494 100%)",
+    color: isGold ? "#1A1A2E" : "white",
+    border: "none",
+    cursor: "pointer",
+    fontSize: "15px",
+    fontWeight: 700,
+    transition: "transform 0.2s, opacity 0.2s",
+    boxShadow: isGold ? "0 4px 12px rgba(232,160,32,0.2)" : "0 4px 12px rgba(26,60,110,0.2)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+});
+
+const inputStyle = {
+    width: "100%",
+    padding: "12px 16px",
+    borderRadius: "12px",
+    border: "2px solid #E2E8F0",
+    fontSize: "16px",
+    fontWeight: 600,
+    letterSpacing: "2px",
+    textAlign: "center" as const,
+    boxSizing: "border-box" as const,
+    outline: "none",
+};
+
+const linkButtonStyle = {
+    color: "#1A3C6E",
+    fontWeight: 700,
+    textDecoration: "underline",
+    background: "none",
+    border: "none",
+    cursor: "pointer",
+    fontSize: "13px",
+    padding: 0,
+};

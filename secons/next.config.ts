@@ -14,6 +14,11 @@ const nextConfig: NextConfig = {
         hostname: "uploadthing.com",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "res.cloudinary.com",
+        pathname: "/**",
+      },
     ],
   },
 };

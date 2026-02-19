@@ -1,75 +1,64 @@
 "use client";
 
-import {
-    createContext,
-    useContext,
-    useEffect,
-    useState,
-    useCallback,
-    type ReactNode,
-} from "react";
-import { onAuthStateChanged, type User as FirebaseUser } from "firebase/auth";
-import { getAuthInstance, signIn, signOut, getIdToken } from "@/lib/firebase-client";
-import type { SessionUser } from "@/types/auth";
-
-// ============================================================
-// Auth Context
-// ============================================================
+import React, { createContext, useState, useEffect, useCallback } from "react";
+import { onAuthStateChanged, signInWithEmailAndPassword, type User as FirebaseUser } from "firebase/auth";
+import { getAuthInstance, signInWithGoogle, signOut as firebaseSignOut, getIdToken } from "@/lib/firebase-client";
+import type { IUser } from "@/models/User";
+import type { ApiResponse } from "@/types/api";
 
 interface AuthContextType {
-    user: SessionUser | null;
+    user: IUser | null;
     firebaseUser: FirebaseUser | null;
     loading: boolean;
-    signInWithEmail: (email: string, password: string) => Promise<SessionUser>;
-    logout: () => Promise<void>;
+    signInWithGoogle: () => Promise<void>;
+    signIn: (email: string, password: string) => Promise<void>;
+    signOut: () => Promise<void>;
     refreshUser: () => Promise<void>;
     getToken: () => Promise<string | null>;
 }
 
-const AuthContext = createContext<AuthContextType>({
+export const AuthContext = createContext<AuthContextType>({
     user: null,
     firebaseUser: null,
     loading: true,
-    signInWithEmail: async () => {
-        throw new Error("AuthProvider not mounted");
-    },
-    logout: async () => { },
+    signInWithGoogle: async () => { },
+    signIn: async () => { },
+    signOut: async () => { },
     refreshUser: async () => { },
     getToken: async () => null,
 });
 
-// ============================================================
-// Auth Provider
-// ============================================================
-
-export function AuthProvider({ children }: { children: ReactNode }) {
-    const [user, setUser] = useState<SessionUser | null>(null);
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+    const [user, setUser] = useState<IUser | null>(null);
     const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
     const [loading, setLoading] = useState(true);
 
-    // Fetch the MongoDB user profile using the Firebase token
-    const fetchProfile = useCallback(async (fbUser: FirebaseUser): Promise<SessionUser | null> => {
+    const fetchUserProfile = useCallback(async (firebaseUser: FirebaseUser) => {
         try {
-            const token = await fbUser.getIdToken();
+            const token = await firebaseUser.getIdToken();
             const res = await fetch("/api/auth/me", {
-                headers: { Authorization: `Bearer ${token}` },
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
             });
-            if (!res.ok) return null;
-            const data = await res.json();
-            return data.data as SessionUser;
-        } catch {
-            return null;
+            const result: ApiResponse<IUser> = await res.json();
+            if (result.success && result.data) {
+                setUser(result.data);
+            } else {
+                setUser(null);
+            }
+        } catch (error) {
+            console.error("Failed to fetch user profile:", error);
+            setUser(null);
         }
     }, []);
 
-    // Listen to Firebase auth state
     useEffect(() => {
         const auth = getAuthInstance();
         const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
             setFirebaseUser(fbUser);
             if (fbUser) {
-                const profile = await fetchProfile(fbUser);
-                setUser(profile);
+                await fetchUserProfile(fbUser);
             } else {
                 setUser(null);
             }
@@ -77,47 +66,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
 
         return () => unsubscribe();
-    }, [fetchProfile]);
+    }, [fetchUserProfile]);
 
-    // Sign in
-    const signInWithEmail = useCallback(
-        async (email: string, password: string): Promise<SessionUser> => {
+    const handleSignInWithGoogle = async () => {
+        try {
             setLoading(true);
-            try {
-                const fbUser = await signIn(email, password);
-                setFirebaseUser(fbUser);
-                const profile = await fetchProfile(fbUser);
-                if (!profile) {
-                    throw new Error("User profile not found. Contact the General Animator.");
-                }
-                setUser(profile);
-                return profile;
-            } finally {
-                setLoading(false);
-            }
-        },
-        [fetchProfile]
-    );
-
-    // Sign out
-    const logout = useCallback(async () => {
-        await signOut();
-        setUser(null);
-        setFirebaseUser(null);
-    }, []);
-
-    // Refresh profile
-    const refreshUser = useCallback(async () => {
-        if (firebaseUser) {
-            const profile = await fetchProfile(firebaseUser);
-            setUser(profile);
+            await signInWithGoogle();
+            // User profile will be fetched by onAuthStateChanged listener
+        } catch (error) {
+            console.error("Google Sign-In Error:", error);
+            setLoading(false);
+            throw error;
         }
-    }, [firebaseUser, fetchProfile]);
+    };
 
-    // Get token
-    const getToken = useCallback(async (): Promise<string | null> => {
-        return getIdToken(firebaseUser);
-    }, [firebaseUser]);
+    const handleSignIn = async (email: string, password: string) => {
+        try {
+            setLoading(true);
+            const auth = getAuthInstance();
+            await signInWithEmailAndPassword(auth, email, password);
+            // User profile will be fetched by onAuthStateChanged listener
+        } catch (error) {
+            console.error("Sign-In Error:", error);
+            setLoading(false);
+            throw error;
+        }
+    };
+
+    const handleSignOut = async () => {
+        try {
+            await firebaseSignOut();
+            setUser(null);
+        } catch (error) {
+            console.error("Sign-Out Error:", error);
+        }
+    };
+
+    const refreshUser = async () => {
+        const auth = getAuthInstance();
+        if (auth.currentUser) {
+            await fetchUserProfile(auth.currentUser);
+        }
+    };
+
+    const getToken = async () => {
+        const auth = getAuthInstance();
+        return await getIdToken(auth.currentUser);
+    };
 
     return (
         <AuthContext.Provider
@@ -125,8 +120,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 user,
                 firebaseUser,
                 loading,
-                signInWithEmail,
-                logout,
+                signInWithGoogle: handleSignInWithGoogle,
+                signIn: handleSignIn,
+                signOut: handleSignOut,
                 refreshUser,
                 getToken,
             }}
@@ -134,16 +130,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             {children}
         </AuthContext.Provider>
     );
-}
-
-// ============================================================
-// Hook
-// ============================================================
-
-export function useAuthContext() {
-    const ctx = useContext(AuthContext);
-    if (!ctx) {
-        throw new Error("useAuthContext must be used inside AuthProvider");
-    }
-    return ctx;
 }

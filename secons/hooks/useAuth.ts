@@ -1,31 +1,39 @@
 "use client";
 
-import { useAuthContext } from "@/components/providers/AuthProvider";
+import { useContext } from "react";
+import { AuthContext } from "@/components/providers/AuthProvider";
 
 /**
- * useAuth — primary auth hook for components.
- * Returns user profile, loading state, and auth actions.
+ * Hook to access authentication context throughout the application.
+ * 
+ * Provides:
+ * - user: The current authenticated user's MongoDB profile (null if not logged in)
+ * - loading: Boolean indicating if auth state is still being determined
+ * - signInWithGoogle: Method to trigger Google Sign-In popup
+ * - signOut: Method to sign the user out of Firebase and clear the profile
+ * - refreshUser: Method to re-fetch the user profile from the server
+ * - getToken: Method to get the current Firebase ID token for API requests
+ * 
+ * @returns AuthContextType
  */
 export function useAuth() {
-    const { user, firebaseUser, loading, signInWithEmail, logout, refreshUser, getToken } =
-        useAuthContext();
+    const context = useContext(AuthContext);
+
+    if (context === undefined) {
+        throw new Error("useAuth must be used within an AuthProvider");
+    }
 
     return {
-        /** MongoDB user profile (null if not authenticated) */
-        user,
-        /** Firebase user object */
-        firebaseUser,
-        /** True while auth state is being determined */
-        loading,
-        /** Whether the user is authenticated */
-        isAuthenticated: !!user,
-        /** Sign in with email + password */
-        signIn: signInWithEmail,
-        /** Sign out */
-        signOut: logout,
-        /** Re-fetch user profile from server */
-        refreshUser,
-        /** Get current Firebase ID token for API calls */
-        getToken,
+        user: context.user,
+        firebaseUser: context.firebaseUser,
+        loading: context.loading,
+        signInWithGoogle: context.signInWithGoogle,
+        signIn: context.signIn,
+        signOut: context.signOut,
+        refreshUser: context.refreshUser,
+        getToken: context.getToken,
+        isAuthenticated: !!context.firebaseUser,
+        hasProfile: !!context.user,
+        onboardingComplete: context.user?.onboardingComplete || false,
     };
 }

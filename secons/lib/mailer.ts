@@ -42,6 +42,7 @@ export function invitationEmailHtml(params: {
     recipientName: string;
     role: string;
     inviteUrl: string;
+    accessCode: string;
     senderName: string;
 }): string {
     return `
@@ -56,12 +57,25 @@ export function invitationEmailHtml(params: {
           You've been invited by <strong>${params.senderName}</strong> to join SECONS as a
           <strong style="color: #E8A020;">${params.role}</strong>.
         </p>
+
+        <div style="background: #FEF6E8; border: 2px dashed #F5C675; border-radius: 12px; padding: 24px; text-align: center; margin: 24px 0;">
+          <p style="margin: 0 0 8px; font-size: 14px; color: #8C6013; font-weight: 600;">YOUR ACCESS CODE</p>
+          <p style="margin: 0; font-size: 32px; font-weight: 800; color: #1A3C6E; letter-spacing: 4px;">${params.accessCode}</p>
+        </div>
+
         <div style="text-align: center; margin: 32px 0;">
           <a href="${params.inviteUrl}" style="display: inline-block; padding: 14px 36px; background: linear-gradient(135deg, #E8A020, #F0B84D); color: #1A1A2E; font-weight: 700; font-size: 16px; border-radius: 99px; text-decoration: none;">
             Accept Invitation
           </a>
         </div>
-        <p style="color: #9CA3AF; font-size: 13px;">This invitation expires in 48 hours. If you didn&apos;t expect this, ignore this email.</p>
+        
+        <p style="color: #6B7280; font-size: 14px; text-align: center;">
+          Click the button above or go to the login page and enter your access code manually.
+        </p>
+
+        <p style="color: #9CA3AF; font-size: 13px; margin-top: 32px; border-top: 1px solid #F3F4F6; padding-top: 24px;">
+          This invitation expires in 48 hours. If you didn't expect this, ignore this email.
+        </p>
       </div>
     </div>
   `;
@@ -103,12 +117,14 @@ export async function sendInvitationEmail(
         domain: string;
         inviterName: string;
         acceptUrl: string;
+        accessCode: string;
     }
 ): Promise<void> {
     const html = invitationEmailHtml({
         recipientName: params.inviteeName,
         role: params.role,
         inviteUrl: params.acceptUrl,
+        accessCode: params.accessCode,
         senderName: params.inviterName,
     });
     await sendMail({

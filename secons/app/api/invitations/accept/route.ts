@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import { connectDB } from "@/lib/db";
 import InvitationToken from "@/models/InvitationToken";
 import User from "@/models/User";
-import { createFirebaseUser, setCustomClaims } from "@/lib/firebase-admin";
+import { verifyAndDecodeToken, setCustomClaims } from "@/lib/firebase-admin";
 import { authRateLimit } from "@/lib/rate-limiter";
 import { logAuth } from "@/lib/audit-logger";
 import type { ApiResponse } from "@/types/api";
 import type { UserRole, UserDomain } from "@/types/auth";
 
 // ============================================================
-// POST /api/invitations/accept — Accept an invitation
+// POST /api/invitations/accept — Accept an invitation with Google Auth
+// Expects: { code: string } in body and Google ID Token in Authorization header
 // ============================================================
 export async function POST(req: NextRequest) {
     try {
@@ -24,121 +24,97 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        const body = await req.json();
-        const { token, password, invitationId } = body;
-
-        if (!token || !password || !invitationId) {
+        const authHeader = req.headers.get("authorization");
+        if (!authHeader?.startsWith("Bearer ")) {
             return NextResponse.json<ApiResponse<null>>(
-                { success: false, error: "Token, password, and invitation ID are required" },
+                { success: false, error: "Authentication required" },
+                { status: 401 }
+            );
+        }
+
+        const body = await req.json();
+        const { code } = body;
+
+        if (!code) {
+            return NextResponse.json<ApiResponse<null>>(
+                { success: false, error: "Access code is required" },
                 { status: 400 }
             );
         }
 
-        if (typeof password !== "string" || password.length < 8) {
+        const token = authHeader.split("Bearer ")[1];
+        const decodedToken = await verifyAndDecodeToken(token);
+
+        if (!decodedToken.email) {
             return NextResponse.json<ApiResponse<null>>(
-                { success: false, error: "Password must be at least 8 characters" },
+                { success: false, error: "Email missing from Google token" },
                 { status: 400 }
             );
         }
 
         await connectDB();
 
-        // Find the invitation
-        const invitation = await InvitationToken.findById(invitationId);
-        if (!invitation) {
+        // 1. Find and validate the invitation
+        const invite = await InvitationToken.findOne({
+            token: code.toUpperCase(),
+            used: false,
+            expiresAt: { $gt: new Date() },
+        });
+
+        if (!invite) {
             return NextResponse.json<ApiResponse<null>>(
-                { success: false, error: "Invitation not found" },
+                { success: false, error: "Invalid or expired access code" },
                 { status: 404 }
             );
         }
 
-        // Check if already used
-        if (invitation.used) {
-            return NextResponse.json<ApiResponse<null>>(
-                { success: false, error: "This invitation has already been used" },
-                { status: 400 }
-            );
-        }
-
-        // Check expiry
-        if (new Date() > invitation.expiresAt) {
-            return NextResponse.json<ApiResponse<null>>(
-                { success: false, error: "This invitation has expired. Please request a new one." },
-                { status: 400 }
-            );
-        }
-
-        // Verify token hash
-        const isValid = await bcrypt.compare(token, invitation.tokenHash);
-        if (!isValid) {
-            return NextResponse.json<ApiResponse<null>>(
-                { success: false, error: "Invalid invitation token" },
-                { status: 400 }
-            );
-        }
-
-        // Check if email already registered
-        const existingUser = await User.findOne({ email: invitation.email }).lean();
-        if (existingUser) {
+        // 2. Check if MongoDB user already exists
+        let user = await User.findOne({ email: decodedToken.email.toLowerCase() });
+        if (user) {
             return NextResponse.json<ApiResponse<null>>(
                 { success: false, error: "An account with this email already exists" },
                 { status: 409 }
             );
         }
 
-        // Create Firebase user
-        const firebaseUser = await createFirebaseUser(invitation.email, password, invitation.name);
-
-        // Set custom claims
-        await setCustomClaims(firebaseUser.uid, {
-            role: invitation.role as UserRole,
-            domain: (invitation.domain || "general") as UserDomain,
+        // 3. Set custom claims in Firebase
+        await setCustomClaims(decodedToken.uid, {
+            role: invite.role as UserRole,
+            domain: (invite.domain || "general") as UserDomain,
         });
 
-        // Create MongoDB user
-        const newUser = await User.create({
-            uid: firebaseUser.uid,
-            name: invitation.name,
-            email: invitation.email,
-            role: invitation.role,
-            domain: invitation.domain || "general",
+        // 4. Create MongoDB user record
+        user = await User.create({
+            uid: decodedToken.uid,
+            name: decodedToken.name || invite.name,
+            email: decodedToken.email.toLowerCase(),
+            role: invite.role,
+            domain: invite.domain || "general",
             isActive: true,
             onboardingComplete: false,
             tourComplete: false,
             lastActiveAt: new Date(),
         });
 
-        // Mark invitation as used
-        invitation.used = true;
-        await invitation.save();
+        // 5. Mark invitation as used
+        invite.used = true;
+        await invite.save();
 
-        await logAuth("USER_LOGIN", "INFO", String(newUser._id), {
+        await logAuth("USER_CREATED", "INFO", String(user._id), {
             action: "INVITATION_ACCEPTED",
-            email: invitation.email,
-            role: invitation.role,
+            email: decodedToken.email,
+            role: invite.role,
+            code: invite.token,
         });
 
-        return NextResponse.json<ApiResponse<{ uid: string; email: string; role: string }>>({
+        return NextResponse.json<ApiResponse<{ uid: string; role: string }>>({
             success: true,
-            data: {
-                uid: firebaseUser.uid,
-                email: invitation.email,
-                role: invitation.role,
-            },
+            data: { uid: decodedToken.uid, role: invite.role },
         }, { status: 201 });
     } catch (error) {
         console.error("POST /api/invitations/accept error:", error);
-
-        const message = (error as Error).message;
-        if (message.includes("email-already-exists")) {
-            return NextResponse.json<ApiResponse<null>>(
-                { success: false, error: "This email is already registered in Firebase" },
-                { status: 409 }
-            );
-        }
-
         return NextResponse.json<ApiResponse<null>>(
-            { success: false, error: "Internal server error" },
+            { success: false, error: (error as Error).message || "Internal server error" },
             { status: 500 }
         );
     }

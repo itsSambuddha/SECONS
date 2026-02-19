@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -12,9 +12,12 @@ const ROLE_LABELS: Record<string, string> = {
     student: "Student",
 };
 
+// Roles that MUST upload a photo (shown on contact page)
+const PHOTO_REQUIRED_ROLES = ["ga", "jga", "animator"];
+
 const STEPS = [
     { title: "Welcome", description: "Let's get you started with SECONS" },
-    { title: "Your Profile", description: "Add a few details about yourself" },
+    { title: "Your Profile", description: "Upload your photo" },
     { title: "You're All Set", description: "Start using SECONS" },
 ];
 
@@ -23,9 +26,14 @@ export default function OnboardingPage() {
     const { user, getToken, refreshUser, loading: authLoading } = useAuth();
     const [step, setStep] = useState(0);
     const [photoURL, setPhotoURL] = useState("");
+    const [photoPreview, setPhotoPreview] = useState("");
+    const [uploading, setUploading] = useState(false);
+    const [uploadError, setUploadError] = useState("");
     const [saving, setSaving] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Redirect if not logged in or already onboarded
+    const isPhotoRequired = user ? PHOTO_REQUIRED_ROLES.includes(user.role) : false;
+
     useEffect(() => {
         if (!authLoading) {
             if (!user) {
@@ -35,6 +43,56 @@ export default function OnboardingPage() {
             }
         }
     }, [user, authLoading, router]);
+
+    const handleFileSelect = async (file: File) => {
+        setUploadError("");
+
+        if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+            setUploadError("Only JPEG, PNG, and WebP images are allowed");
+            return;
+        }
+        if (file.size > 2 * 1024 * 1024) {
+            setUploadError("File size must be under 2MB");
+            return;
+        }
+
+        // Show preview immediately
+        const reader = new FileReader();
+        reader.onload = (e) => setPhotoPreview(e.target?.result as string);
+        reader.readAsDataURL(file);
+
+        // Upload
+        setUploading(true);
+        try {
+            const token = await getToken();
+            const formData = new FormData();
+            formData.append("avatar", file);
+
+            const res = await fetch("/api/upload/avatar", {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}` },
+                body: formData,
+            });
+            const data = await res.json();
+            if (data.success) {
+                setPhotoURL(data.data.url);
+            } else {
+                setUploadError(data.error || "Upload failed");
+                setPhotoPreview("");
+            }
+        } catch {
+            setUploadError("Upload failed. Please try again.");
+            setPhotoPreview("");
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        const file = e.dataTransfer.files[0];
+        if (file) handleFileSelect(file);
+    };
 
     const finishOnboarding = async () => {
         setSaving(true);
@@ -60,6 +118,9 @@ export default function OnboardingPage() {
             setSaving(false);
         }
     };
+
+    // Can proceed from step 1 only if photo uploaded (when required)
+    const canProceedFromStep1 = isPhotoRequired ? !!photoURL : true;
 
     if (authLoading || !user) {
         return (
@@ -120,7 +181,7 @@ export default function OnboardingPage() {
                                     {user.domain !== "general" ? ` in the ${user.domain} domain` : ""}.
                                 </p>
                                 <p style={{ fontSize: "14px", color: "#6B7280", margin: 0, lineHeight: 1.6 }}>
-                                    SECONS is the central platform for managing EdBlazon — your college&apos;s annual cultural &amp; sports week. Everything from event scheduling to live score tracking happens here.
+                                    SECONS is the central platform for managing EdBlazon — your college&apos;s annual cultural &amp; sports week.
                                 </p>
                             </div>
 
@@ -148,27 +209,80 @@ export default function OnboardingPage() {
 
                     {step === 1 && (
                         <div>
-                            <div style={{ marginBottom: "20px" }}>
-                                <label style={{
-                                    display: "block", fontSize: "13px", fontWeight: 600,
-                                    color: "#1A1A2E", marginBottom: "6px",
-                                }}>
-                                    Profile Photo URL (optional)
-                                </label>
+                            {/* Photo Upload */}
+                            <div style={{ textAlign: "center", marginBottom: "20px" }}>
                                 <input
-                                    type="url"
-                                    value={photoURL}
-                                    onChange={(e) => setPhotoURL(e.target.value)}
-                                    placeholder="https://example.com/your-photo.jpg"
-                                    style={{
-                                        width: "100%", padding: "10px 14px", borderRadius: "10px",
-                                        border: "1px solid #E2E8F0", fontSize: "14px", outline: "none",
-                                        boxSizing: "border-box",
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept="image/jpeg,image/png,image/webp"
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) handleFileSelect(file);
                                     }}
+                                    style={{ display: "none" }}
                                 />
-                                <p style={{ fontSize: "12px", color: "#9CA3AF", marginTop: "6px" }}>
-                                    You can also update this later in your profile settings.
+
+                                {/* Avatar Preview / Upload Area */}
+                                <div
+                                    onClick={() => fileInputRef.current?.click()}
+                                    onDrop={handleDrop}
+                                    onDragOver={(e) => e.preventDefault()}
+                                    style={{
+                                        width: "120px", height: "120px", borderRadius: "50%",
+                                        margin: "0 auto 12px", cursor: "pointer",
+                                        overflow: "hidden", position: "relative",
+                                        border: photoPreview ? "3px solid #E8A020" : "3px dashed #CBD5E1",
+                                        background: photoPreview ? "transparent" : "#F8F9FB",
+                                        display: "flex", alignItems: "center", justifyContent: "center",
+                                        transition: "border-color 0.2s",
+                                    }}
+                                >
+                                    {photoPreview ? (
+                                        <img
+                                            src={photoPreview}
+                                            alt="Profile preview"
+                                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                                        />
+                                    ) : (
+                                        <div style={{ textAlign: "center", padding: "8px" }}>
+                                            <div style={{ fontSize: "28px", marginBottom: "2px" }}>📷</div>
+                                            <span style={{ fontSize: "10px", color: "#9CA3AF" }}>
+                                                Click to upload
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    {uploading && (
+                                        <div style={{
+                                            position: "absolute", inset: 0,
+                                            background: "rgba(255,255,255,0.8)",
+                                            display: "flex", alignItems: "center", justifyContent: "center",
+                                        }}>
+                                            <div style={{
+                                                width: "24px", height: "24px",
+                                                border: "3px solid #E2E8F0", borderTopColor: "#1A3C6E",
+                                                borderRadius: "50%", animation: "spin 0.8s linear infinite",
+                                            }} />
+                                            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <p style={{ fontSize: "13px", color: "#6B7280", margin: "0 0 4px" }}>
+                                    {photoPreview ? "Click to change photo" : "Click or drag & drop your photo"}
                                 </p>
+                                <p style={{ fontSize: "11px", color: "#9CA3AF", margin: 0 }}>
+                                    JPEG, PNG, or WebP · Max 2MB
+                                    {isPhotoRequired && (
+                                        <span style={{ color: "#DC2626", fontWeight: 600 }}> · Required</span>
+                                    )}
+                                </p>
+
+                                {uploadError && (
+                                    <p style={{ fontSize: "12px", color: "#DC2626", margin: "8px 0 0" }}>
+                                        {uploadError}
+                                    </p>
+                                )}
                             </div>
 
                             <div style={{
@@ -224,10 +338,15 @@ export default function OnboardingPage() {
                     {step < STEPS.length - 1 ? (
                         <button
                             onClick={() => setStep(step + 1)}
+                            disabled={step === 1 && !canProceedFromStep1}
                             style={{
                                 padding: "10px 24px", borderRadius: "10px",
-                                background: "linear-gradient(135deg, #1A3C6E 0%, #2A5494 100%)",
-                                color: "white", border: "none", cursor: "pointer",
+                                background: (step === 1 && !canProceedFromStep1)
+                                    ? "#E5E7EB"
+                                    : "linear-gradient(135deg, #1A3C6E 0%, #2A5494 100%)",
+                                color: (step === 1 && !canProceedFromStep1) ? "#9CA3AF" : "white",
+                                border: "none",
+                                cursor: (step === 1 && !canProceedFromStep1) ? "not-allowed" : "pointer",
                                 fontSize: "14px", fontWeight: 600,
                             }}
                         >
