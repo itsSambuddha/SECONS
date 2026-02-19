@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Syne } from "next/font/google";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "react-hot-toast";
 import "./globals.css";
 
 const inter = Inter({
@@ -46,7 +48,19 @@ export default function RootLayout({
         className={`${inter.variable} ${syne.variable} antialiased`}
         style={{ fontFamily: "var(--font-body)" }}
       >
-        {children}
+        <TooltipProvider>
+          {children}
+        </TooltipProvider>
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            duration: 4000,
+            style: {
+              borderRadius: "var(--radius-md)",
+              fontSize: "14px",
+            },
+          }}
+        />
       </body>
     </html>
   );
