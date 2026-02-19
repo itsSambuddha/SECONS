@@ -91,3 +91,29 @@ export function meetingNotificationHtml(params: {
     </div>
   `;
 }
+
+// ============================================================
+// Convenience: Send invitation email
+// ============================================================
+export async function sendInvitationEmail(
+    to: string,
+    params: {
+        inviteeName: string;
+        role: string;
+        domain: string;
+        inviterName: string;
+        acceptUrl: string;
+    }
+): Promise<void> {
+    const html = invitationEmailHtml({
+        recipientName: params.inviteeName,
+        role: params.role,
+        inviteUrl: params.acceptUrl,
+        senderName: params.inviterName,
+    });
+    await sendMail({
+        to,
+        subject: `You've been invited to SECONS as ${params.role}`,
+        html,
+    });
+}

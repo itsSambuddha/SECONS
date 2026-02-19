@@ -32,6 +32,7 @@ export type AuditEventType =
     | "YEAR_RESET_COMPLETE"
     | "RATE_LIMIT_BAN"
     | "AUTH_FAILURE"
+    | "USER_LOGIN"
     | "SYSTEM";
 
 export type AuditSeverity = "INFO" | "WARNING" | "CRITICAL";
@@ -94,4 +95,8 @@ export async function logWarning(eventType: AuditEventType, userId: string, deta
 
 export async function logCritical(eventType: AuditEventType, userId: string, details: Record<string, unknown>) {
     return logAuditEvent({ eventType, severity: "CRITICAL", userId, details });
+}
+
+export async function logAuth(eventType: AuditEventType, severity: AuditSeverity, userId: string, details: Record<string, unknown>) {
+    return logAuditEvent({ eventType, severity, userId, details });
 }

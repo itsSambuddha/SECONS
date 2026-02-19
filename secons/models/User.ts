@@ -16,6 +16,7 @@ export interface IUser extends Document {
     isActive: boolean;
     onboardingComplete: boolean;
     tourComplete: boolean;
+    lastActiveAt: Date;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -46,6 +47,7 @@ const userSchema = new Schema<IUser>(
         isActive: { type: Boolean, default: true, index: true },
         onboardingComplete: { type: Boolean, default: false },
         tourComplete: { type: Boolean, default: false },
+        lastActiveAt: { type: Date, default: Date.now },
     },
     {
         timestamps: true,

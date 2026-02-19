@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Syne } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider } from "@/components/providers/AuthProvider";
 import { Toaster } from "react-hot-toast";
 import "./globals.css";
 
@@ -49,7 +50,9 @@ export default function RootLayout({
         style={{ fontFamily: "var(--font-body)" }}
       >
         <TooltipProvider>
-          {children}
+          <AuthProvider>
+            {children}
+          </AuthProvider>
         </TooltipProvider>
         <Toaster
           position="top-right"
