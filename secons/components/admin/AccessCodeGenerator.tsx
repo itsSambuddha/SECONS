@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useRole } from "@/hooks/useRole";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ const ALLOWED_ROLES = [
     { value: "student", label: "Student" },
 ];
 
-const ALLOWED_DOMAINS = [
+const GA_DOMAINS = [
     { value: "general", label: "General" },
     { value: "sports", label: "Sports" },
     { value: "cultural", label: "Cultural" },
@@ -38,6 +38,8 @@ export function AccessCodeGenerator({ onSuccess }: { onSuccess?: () => void }) {
     const [domain, setDomain] = useState("general");
     const [generatedCode, setGeneratedCode] = useState<string | null>(null);
     const [codeData, setCodeData] = useState<{ role: string, domain: string } | null>(null);
+    const [jgaDomains, setJgaDomains] = useState<{ value: string; label: string }[]>([]);
+    const [domainsLoading, setDomainsLoading] = useState(false);
 
     // Only GA can invite JGAs/Animators? Check permissions.
     // Plan: GA invites all. JGA invites animator/volunteer/student.
@@ -46,6 +48,41 @@ export function AccessCodeGenerator({ onSuccess }: { onSuccess?: () => void }) {
         if (isJGA) return r.value !== "jga";
         return false; // Others cannot create invites
     });
+
+    // Fetch event-based domains for JGA
+    useEffect(() => {
+        if (!isJGA) return;
+        const fetchDomains = async () => {
+            setDomainsLoading(true);
+            try {
+                const token = await getToken();
+                const res = await fetch("/api/events/domains", {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                const data = await res.json();
+                if (data.success && data.data.domains.length > 0) {
+                    setJgaDomains(
+                        data.data.domains.map((d: string) => ({
+                            value: d,
+                            label: d.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()),
+                        }))
+                    );
+                    setDomain(data.data.domains[0]);
+                } else {
+                    // Fallback: no events created yet, use GA domains
+                    setJgaDomains(GA_DOMAINS);
+                }
+            } catch {
+                setJgaDomains(GA_DOMAINS);
+            } finally {
+                setDomainsLoading(false);
+            }
+        };
+        fetchDomains();
+    }, [isJGA]);
+
+    // GA uses hardcoded domains, JGA uses fetched domains
+    const availableDomains = isGA ? GA_DOMAINS : jgaDomains;
 
     const handleGenerate = async () => {
         setLoading(true);
@@ -145,7 +182,7 @@ export function AccessCodeGenerator({ onSuccess }: { onSuccess?: () => void }) {
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                                {ALLOWED_DOMAINS.map((d) => (
+                                {availableDomains.map((d) => (
                                     <SelectItem key={d.value} value={d.value}>
                                         {d.label}
                                     </SelectItem>

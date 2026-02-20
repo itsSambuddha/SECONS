@@ -111,7 +111,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const getToken = async () => {
         const auth = getAuthInstance();
-        return await getIdToken(auth.currentUser);
+        // Force refresh to pick up latest custom claims (role, domain)
+        return await getIdToken(auth.currentUser, true);
     };
 
     return (

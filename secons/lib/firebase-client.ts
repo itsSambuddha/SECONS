@@ -50,11 +50,11 @@ export async function signOut() {
 }
 
 // Get current ID token
-export async function getIdToken(user?: User | null): Promise<string | null> {
+export async function getIdToken(user?: User | null, forceRefresh?: boolean): Promise<string | null> {
     const authInstance = getAuth(getFirebaseApp());
     const currentUser = user || authInstance.currentUser;
     if (!currentUser) return null;
-    return currentUser.getIdToken();
+    return currentUser.getIdToken(forceRefresh);
 }
 
 // Get current user

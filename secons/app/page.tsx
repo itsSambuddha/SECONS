@@ -1,1065 +1,493 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
+import { motion, useScroll, useTransform, useInView } from "framer-motion";
+import {
+  CalendarDays, Trophy, Users, Zap, Shield, BarChart3, MessageCircle, Map as MapIcon,
+  ArrowRight, ChevronDown, Menu, X, Check, Star, Play
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 /* ============================
-   ICON COMPONENTS (inline SVG)
+   CONSTANTS & DATA
    ============================ */
-function IconCalendar({ className = "" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="4" width="18" height="18" rx="2" />
-      <path d="M16 2v4M8 2v4M3 10h18" />
-    </svg>
-  );
-}
-function IconTrophy({ className = "" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
-      <path d="M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
-      <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
-    </svg>
-  );
-}
-function IconUsers({ className = "" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
-    </svg>
-  );
-}
-function IconZap({ className = "" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-    </svg>
-  );
-}
-function IconShield({ className = "" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-      <path d="m9 12 2 2 4-4" />
-    </svg>
-  );
-}
-function IconBarChart({ className = "" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="12" x2="12" y1="20" y2="10" />
-      <line x1="18" x2="18" y1="20" y2="4" />
-      <line x1="6" x2="6" y1="20" y2="16" />
-    </svg>
-  );
-}
-function IconMessageCircle({ className = "" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
-    </svg>
-  );
-}
-function IconMap({ className = "" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21" />
-      <line x1="9" x2="9" y1="3" y2="18" />
-      <line x1="15" x2="15" y1="6" y2="21" />
-    </svg>
-  );
-}
-function IconArrowRight({ className = "", style }: { className?: string; style?: React.CSSProperties }) {
-  return (
-    <svg className={className} style={style} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M5 12h14M12 5l7 7-7 7" />
-    </svg>
-  );
-}
-function IconChevronDown({ className = "", style }: { className?: string; style?: React.CSSProperties }) {
-  return (
-    <svg className={className} style={style} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="m6 9 6 6 6-6" />
-    </svg>
-  );
-}
-function IconMenu({ className = "" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="4" x2="20" y1="12" y2="12" />
-      <line x1="4" x2="20" y1="6" y2="6" />
-      <line x1="4" x2="20" y1="18" y2="18" />
-    </svg>
-  );
-}
-function IconX({ className = "" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M18 6 6 18M6 6l12 12" />
-    </svg>
-  );
-}
 
-/* ============================
-   ANIMATED COUNTER
-   ============================ */
-function AnimatedCounter({ target, suffix = "", duration = 2000 }: { target: number; suffix?: string; duration?: number }) {
-  const [count, setCount] = useState(0);
-  const [hasStarted, setHasStarted] = useState(false);
-  const ref = useRef<HTMLSpanElement>(null);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && !hasStarted) {
-          setHasStarted(true);
-        }
-      },
-      { threshold: 0.5 }
-    );
-    if (ref.current) observer.observe(ref.current);
-    return () => observer.disconnect();
-  }, [hasStarted]);
-
-  useEffect(() => {
-    if (!hasStarted) return;
-    let start = 0;
-    const step = target / (duration / 16);
-    const timer = setInterval(() => {
-      start += step;
-      if (start >= target) {
-        setCount(target);
-        clearInterval(timer);
-      } else {
-        setCount(Math.floor(start));
-      }
-    }, 16);
-    return () => clearInterval(timer);
-  }, [hasStarted, target, duration]);
-
-  return <span ref={ref}>{count}{suffix}</span>;
-}
-
-/* ============================
-   FLOATING PARTICLES
-   ============================ */
-function FloatingParticles() {
-  return (
-    <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
-      {Array.from({ length: 30 }).map((_, i) => (
-        <div
-          key={i}
-          style={{
-            position: "absolute",
-            width: `${Math.random() * 4 + 2}px`,
-            height: `${Math.random() * 4 + 2}px`,
-            borderRadius: "50%",
-            background: i % 3 === 0
-              ? "rgba(232, 160, 32, 0.3)"
-              : i % 3 === 1
-                ? "rgba(26, 60, 110, 0.2)"
-                : "rgba(255, 255, 255, 0.15)",
-            left: `${Math.random() * 100}%`,
-            top: `${Math.random() * 100}%`,
-            animation: `float ${4 + Math.random() * 6}s ease-in-out infinite`,
-            animationDelay: `${Math.random() * 4}s`,
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
-/* ============================
-   SECTION DATA
-   ============================ */
-const features = [
+const FEATURES = [
   {
-    icon: IconCalendar,
+    icon: CalendarDays,
     title: "Event Management",
-    description: "Create, publish, and manage events with flyer uploads, registration links, and real-time status tracking.",
-    color: "#2563EB",
+    description: "End-to-end event lifecycle. Upload flyers, track registrations, and manage schedules in real-time.",
+    className: "md:col-span-2",
   },
   {
-    icon: IconTrophy,
-    title: "Sports & Live Scoring",
-    description: "Auto-generated fixtures for 18 teams — pool stage, knockout, or round-robin. Live scoreboard updates via WebSocket.",
-    color: "#E8A020",
+    icon: Trophy,
+    title: "Sports Engine",
+    description: "Automated fixtures & live scoring for 18 teams across multiple disciplines.",
+    className: "md:col-span-1",
   },
   {
-    icon: IconBarChart,
-    title: "Leaderboard & Points",
-    description: "Real-time leaderboard with overall, per-semester, and per-category breakdowns. Animated rank changes.",
-    color: "#16A34A",
+    icon: BarChart3,
+    title: "Live Leaderboard",
+    description: "Real-time point tracking with animated rank changes and category breakdowns.",
+    className: "md:col-span-1",
   },
   {
-    icon: IconMessageCircle,
-    title: "Communication Hub",
-    description: "Role-based chat threads, announcement broadcasts, and meeting scheduler with instant notifications.",
-    color: "#8B5CF6",
+    icon: MessageCircle,
+    title: "Comms Hub",
+    description: "Role-based announcements and secure chat channels for the committee.",
+    className: "md:col-span-2",
   },
   {
-    icon: IconShield,
-    title: "Finance Management",
-    description: "Budget allocation, expense tracking, approval workflows, and PDF receipt generation for complete financial control.",
-    color: "#DC2626",
-  },
-  {
-    icon: IconUsers,
-    title: "Team & Volunteer Ops",
-    description: "Manage 18 competing teams, assign volunteers, track duties, and coordinate the entire organizing committee.",
-    color: "#0EA5E9",
-  },
-  {
-    icon: IconMap,
-    title: "Campus Map & Directory",
-    description: "Annotated campus maps with venue markers. Searchable contact directory for the entire organizing team.",
-    color: "#F97316",
-  },
-  {
-    icon: IconZap,
-    title: "PDF Exports & Reports",
-    description: "Export fixtures, leaderboards, itineraries, receipts, and finance summaries as print-ready PDFs.",
-    color: "#EC4899",
+    icon: Shield,
+    title: "Budget & Finance",
+    description: "Expense tracking, approval workflows, and automated receipt generation.",
+    className: "md:col-span-3",
   },
 ];
 
-const stats = [
-  { number: 18, suffix: "", label: "Competing Teams" },
-  { number: 45, suffix: "+", label: "Events Managed" },
-  { number: 5, suffix: "", label: "User Roles" },
-  { number: 100, suffix: "%", label: "Digital Workflow" },
+const TEAMS = [
+  { group: "Commerce", depts: "Commerce (unified)", color: "bg-amber-500" },
+  { group: "Professional", depts: "Comp App, Social Work", color: "bg-blue-600" },
+  { group: "Life Science", depts: "BioChem, BioTech, Botany", color: "bg-green-600" },
+  { group: "Physical Science", depts: "Physics, Chem, Math, CS", color: "bg-red-600" },
+  { group: "Social Science", depts: "Econ, Pol Sci, Sociology", color: "bg-purple-600" },
+  { group: "Humanities", depts: "English, History, Geo", color: "bg-orange-500" },
 ];
 
-const roles = [
-  { title: "General Animator", tier: "Tier 1", desc: "Super Admin — full platform control", count: "1 person", color: "#E8A020" },
-  { title: "Joint General Animator", tier: "Tier 2", desc: "Domain leads — Sports, Cultural, Literary, etc.", count: "~8 people", color: "#2563EB" },
-  { title: "Animator", tier: "Tier 3", desc: "Event managers — one or more per event", count: "45+ people", color: "#16A34A" },
-  { title: "Volunteer", tier: "Tier 4", desc: "Ground-level helpers assigned to events", count: "Unlimited", color: "#8B5CF6" },
-  { title: "Student", tier: "Tier 5", desc: "Participants — browse events & register", count: "Open", color: "#6B7280" },
-];
-
-const teams = [
-  { group: "Commerce", depts: "Commerce (unified)", color: "#E8A020" },
-  { group: "Professional", depts: "Computer Applications, Social Work PG & UG", color: "#2563EB" },
-  { group: "Life Science", depts: "BioChem, BioTech, Botany, Env. Science, Zoology", color: "#16A34A" },
-  { group: "Physical Science", depts: "Chemistry, CS, Electronics, Physics, Mathematics", color: "#DC2626" },
-  { group: "Social Science", depts: "Economics, Pol. Sci., Psychology, Sociology", color: "#8B5CF6" },
-  { group: "Humanities", depts: "Education, English, Khasi, History, Geography", color: "#F97316" },
+const ROLES = [
+  { title: "General Animator", tier: "Tier 1", desc: "Super Admin Control", color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200" },
+  { title: "Joint General Animator", tier: "Tier 2", desc: "Domain Leadership", color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-200" },
+  { title: "Animator", tier: "Tier 3", desc: "Event Management", color: "text-green-600", bg: "bg-green-50", border: "border-green-200" },
+  { title: "Volunteer", tier: "Tier 4", desc: "On-ground Operations", color: "text-purple-600", bg: "bg-purple-50", border: "border-purple-200" },
+  { title: "Student", tier: "Tier 5", desc: "Participant Access", color: "text-slate-500", bg: "bg-slate-50", border: "border-slate-200" },
 ];
 
 /* ============================
-   MAIN LANDING PAGE
+   COMPONENTS
    ============================ */
-export default function LandingPage() {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+function Navbar() {
   const [scrolled, setScrolled] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 50);
+    const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--color-background)" }}>
-      {/* ===================== NAVBAR ===================== */}
-      <nav
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 50,
-          transition: "all 0.3s ease",
-          background: scrolled ? "rgba(248, 249, 251, 0.92)" : "transparent",
-          backdropFilter: scrolled ? "blur(20px)" : "none",
-          borderBottom: scrolled ? "1px solid var(--color-border)" : "1px solid transparent",
-        }}
-      >
-        <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "0 24px" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: "72px" }}>
-            {/* Logo */}
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <div
-                style={{
-                  width: "40px",
-                  height: "40px",
-                  borderRadius: "var(--radius-md)",
-                  background: "linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  boxShadow: "var(--shadow-md)",
-                }}
-              >
-                <span style={{ color: "white", fontWeight: 800, fontSize: "18px", fontFamily: "var(--font-display)" }}>S</span>
-              </div>
-              <div>
-                <span style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: "20px", color: "var(--color-primary)" }}>
-                  SECONS
-                </span>
-              </div>
-            </div>
-
-            {/* Desktop Nav Links */}
-            <div style={{ display: "flex", alignItems: "center", gap: "32px" }} className="hide-mobile">
-              {["Features", "Teams", "Roles", "About"].map((item) => (
-                <a
-                  key={item}
-                  href={`#${item.toLowerCase()}`}
-                  style={{
-                    fontSize: "14px",
-                    fontWeight: 500,
-                    color: "var(--color-text-secondary)",
-                    transition: "color 0.2s",
-                    cursor: "pointer",
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = "var(--color-primary)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = "var(--color-text-secondary)")}
-                >
-                  {item}
-                </a>
-              ))}
-              <a
-                href="/login"
-                style={{
-                  padding: "10px 24px",
-                  borderRadius: "var(--radius-full)",
-                  background: "linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%)",
-                  color: "white",
-                  fontSize: "14px",
-                  fontWeight: 600,
-                  transition: "all 0.2s",
-                  boxShadow: "var(--shadow-md)",
-                  cursor: "pointer",
-                }}
-              >
-                Sign In
-              </a>
-            </div>
-
-            {/* Mobile Menu Button */}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                padding: "8px",
-                color: "var(--color-text-primary)",
-              }}
-              className="show-mobile-only"
-            >
-              {mobileMenuOpen ? <IconX className="" /> : <IconMenu className="" />}
-            </button>
+    <motion.nav
+      initial={{ y: -100 }}
+      animate={{ y: 0 }}
+      transition={{ duration: 0.5 }}
+      className={cn(
+        "fixed top-0 left-0 right-0 z-50 transition-all duration-300 border-b",
+        scrolled
+          ? "bg-white/80 backdrop-blur-xl border-slate-200 py-3 shadow-sm"
+          : "bg-transparent border-transparent py-5"
+      )}
+    >
+      <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="size-10 rounded-xl bg-gradient-to-br from-primary to-primary-600 flex items-center justify-center shadow-lg shadow-primary/10">
+            <span className="text-white font-display font-bold text-xl">S</span>
           </div>
+          <span className={cn("font-display font-bold text-xl tracking-tight transition-colors", scrolled ? "text-primary" : "text-primary-900")}>
+            SECONS
+          </span>
         </div>
 
-        {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <div
-            style={{
-              background: "var(--color-surface)",
-              borderTop: "1px solid var(--color-border)",
-              padding: "16px 24px",
-              boxShadow: "var(--shadow-lg)",
-            }}
-          >
-            {["Features", "Teams", "Roles", "About"].map((item) => (
-              <a
+        {/* Desktop Nav */}
+        <div className="hidden md:flex items-center gap-8">
+          {["Features", "Teams", "Roles", "Events"].map((item) => (
+            <Link
+              key={item}
+              href={`#${item.toLowerCase()}`}
+              className={cn(
+                "text-sm font-medium transition-colors hover:text-primary",
+                scrolled ? "text-slate-600" : "text-slate-700"
+              )}
+            >
+              {item}
+            </Link>
+          ))}
+          <Link href="/login">
+            <Button className={cn(
+              "rounded-full px-6 transition-all hover:scale-105 shadow-md",
+              scrolled ? "bg-primary text-white hover:bg-primary-600" : "bg-white text-primary hover:bg-slate-50"
+            )}>
+              Sign In
+            </Button>
+          </Link>
+        </div>
+
+        {/* Mobile Toggle */}
+        <button className="md:hidden text-primary" onClick={() => setMobileOpen(!mobileOpen)}>
+          {mobileOpen ? <X /> : <Menu />}
+        </button>
+      </div>
+
+      {/* Mobile Menu */}
+      {mobileOpen && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          className="md:hidden bg-white border-b border-slate-200 shadow-xl"
+        >
+          <div className="flex flex-col p-6 gap-4">
+            {["Features", "Teams", "Roles", "Events"].map((item) => (
+              <Link
                 key={item}
                 href={`#${item.toLowerCase()}`}
-                onClick={() => setMobileMenuOpen(false)}
-                style={{
-                  display: "block",
-                  padding: "12px 0",
-                  fontSize: "16px",
-                  fontWeight: 500,
-                  color: "var(--color-text-secondary)",
-                  borderBottom: "1px solid var(--color-border-light)",
-                }}
+                onClick={() => setMobileOpen(false)}
+                className="text-lg font-medium text-slate-700 hover:text-primary"
               >
                 {item}
-              </a>
+              </Link>
             ))}
-            <a
-              href="/login"
-              style={{
-                display: "block",
-                textAlign: "center",
-                marginTop: "16px",
-                padding: "12px 24px",
-                borderRadius: "var(--radius-full)",
-                background: "linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%)",
-                color: "white",
-                fontWeight: 600,
-              }}
-            >
-              Sign In
-            </a>
+            <Link href="/login" onClick={() => setMobileOpen(false)}>
+              <Button className="w-full bg-primary text-white">Sign In</Button>
+            </Link>
           </div>
-        )}
-      </nav>
+        </motion.div>
+      )}
+    </motion.nav>
+  );
+}
 
-      {/* ===================== HERO SECTION ===================== */}
-      <section
-        style={{
-          position: "relative",
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          overflow: "hidden",
-          background: "linear-gradient(160deg, #0F2847 0%, #1A3C6E 30%, #2A5494 60%, #1A3C6E 100%)",
-        }}
-      >
-        <FloatingParticles />
+function Hero() {
+  const { scrollY } = useScroll();
+  const y1 = useTransform(scrollY, [0, 500], [0, 100]);
+  const opacity = useTransform(scrollY, [0, 300], [1, 0]);
 
-        {/* Decorative orbs */}
-        <div
-          style={{
-            position: "absolute",
-            top: "10%",
-            right: "10%",
-            width: "400px",
-            height: "400px",
-            borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(232, 160, 32, 0.15) 0%, transparent 70%)",
-            filter: "blur(60px)",
-            pointerEvents: "none",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            bottom: "15%",
-            left: "5%",
-            width: "300px",
-            height: "300px",
-            borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(42, 84, 148, 0.3) 0%, transparent 70%)",
-            filter: "blur(50px)",
-            pointerEvents: "none",
-          }}
-        />
+  return (
+    <div className="relative min-h-[90vh] flex items-center justify-center overflow-hidden bg-[#F8F9FB]">
+      {/* Subtle Background Elements */}
+      <div className="absolute inset-0 z-0">
+        <div className="absolute top-[-20%] right-[-10%] w-[800px] h-[800px] rounded-full bg-primary/5 blur-[100px]" />
+        <div className="absolute bottom-[-10%] left-[-5%] w-[600px] h-[600px] rounded-full bg-amber-500/5 blur-[80px]" />
+        <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-[0.02] bg-center mask-image-gradient-to-b" />
+      </div>
 
-        <div style={{ position: "relative", zIndex: 10, maxWidth: "900px", margin: "0 auto", padding: "120px 24px 80px", textAlign: "center" }}>
-          {/* Badge */}
-          <div
-            className="animate-fade-in-up"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "8px",
-              padding: "8px 20px",
-              borderRadius: "var(--radius-full)",
-              background: "rgba(232, 160, 32, 0.15)",
-              border: "1px solid rgba(232, 160, 32, 0.3)",
-              marginBottom: "32px",
-            }}
-          >
-            <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--color-accent)", animation: "pulse-glow 2s ease-in-out infinite" }} />
-            <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--color-accent-light)", letterSpacing: "0.05em", textTransform: "uppercase" }}>
-              EdBlazon Management Platform
-            </span>
-          </div>
+      <div className="relative z-10 max-w-5xl mx-auto px-6 text-center pt-20">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+        >
+          <Badge variant="outline" className="mb-6 px-4 py-1.5 border-primary/20 bg-primary/5 text-primary rounded-full uppercase tracking-widest text-[11px] font-bold shadow-sm">
+            EdBlazon Management Platform
+          </Badge>
+        </motion.div>
 
-          {/* Main Title */}
-          <h1
-            className="animate-fade-in-up delay-100"
-            style={{
-              fontFamily: "var(--font-display)",
-              fontSize: "clamp(2.5rem, 6vw, 5rem)",
-              fontWeight: 800,
-              lineHeight: 1.05,
-              color: "white",
-              marginBottom: "24px",
-              letterSpacing: "-0.03em",
-            }}
-          >
-            <span style={{ display: "block" }}>SECONS</span>
-            <span
-              style={{
-                display: "block",
-                fontSize: "clamp(1rem, 2.5vw, 1.6rem)",
-                fontWeight: 400,
-                fontFamily: "var(--font-body)",
-                color: "rgba(255, 255, 255, 0.7)",
-                marginTop: "8px",
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-              }}
-            >
-              EdBlazon in the palm of your hands
-            </span>
-          </h1>
+        <motion.h1
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.7, delay: 0.1 }}
+          className="font-display font-black text-5xl sm:text-6xl md:text-7xl tracking-tight text-primary-900 mb-6 leading-[1.1]"
+        >
+          The <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-amber-600">Gold Standard</span> <br />
+          of Event Operations.
+        </motion.h1>
 
-          {/* Description */}
-          <p
-            className="animate-fade-in-up delay-200"
-            style={{
-              fontSize: "clamp(1rem, 2vw, 1.2rem)",
-              color: "rgba(255, 255, 255, 0.65)",
-              maxWidth: "640px",
-              margin: "0 auto 40px",
-              lineHeight: 1.7,
-            }}
-          >
-            The single source of truth for your annual college cultural & sports week.
-            Manage events, sports fixtures, finance, communications, and more — all in one platform.
-          </p>
+        <motion.p
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0.2 }}
+          className="text-lg md:text-xl text-slate-500 max-w-2xl mx-auto mb-10 leading-relaxed"
+        >
+          One unified platform to manage fixtures, finances, communications, and 45+ events. Built for the EdBlazon Organizing Committee.
+        </motion.p>
 
-          {/* CTA Buttons */}
-          <div
-            className="animate-fade-in-up delay-300"
-            style={{ display: "flex", gap: "16px", justifyContent: "center", flexWrap: "wrap" }}
-          >
-            <a
-              href="/login"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "14px 32px",
-                borderRadius: "var(--radius-full)",
-                background: "linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-light) 100%)",
-                color: "var(--color-text-on-accent)",
-                fontSize: "16px",
-                fontWeight: 700,
-                boxShadow: "0 4px 20px rgba(232, 160, 32, 0.3)",
-                transition: "all 0.2s",
-                cursor: "pointer",
-              }}
-            >
-              Get Started
-              <IconArrowRight className="" style={{ width: "18px", height: "18px" }} />
-            </a>
-            <a
-              href="#features"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "14px 32px",
-                borderRadius: "var(--radius-full)",
-                background: "rgba(255, 255, 255, 0.1)",
-                border: "1px solid rgba(255, 255, 255, 0.2)",
-                color: "white",
-                fontSize: "16px",
-                fontWeight: 600,
-                transition: "all 0.2s",
-                cursor: "pointer",
-              }}
-            >
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0.3 }}
+          className="flex flex-col sm:flex-row items-center justify-center gap-4"
+        >
+          <Link href="/login">
+            <Button size="lg" className="h-14 px-8 rounded-full bg-primary text-white hover:bg-primary-700 font-bold text-base shadow-lg shadow-primary/20 transition-all hover:scale-105">
+              Get Started <ArrowRight className="ml-2 size-5" />
+            </Button>
+          </Link>
+          <Link href="#features">
+            <Button size="lg" variant="outline" className="h-14 px-8 rounded-full border-slate-200 hover:bg-white hover:text-primary bg-white/50 backdrop-blur-sm text-slate-600">
               Explore Features
-            </a>
-          </div>
+            </Button>
+          </Link>
+        </motion.div>
+      </div>
 
-          {/* Stats Bar */}
-          <div
-            className="animate-fade-in-up delay-500"
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(4, 1fr)",
-              gap: "1px",
-              marginTop: "80px",
-              background: "rgba(255, 255, 255, 0.1)",
-              borderRadius: "var(--radius-lg)",
-              overflow: "hidden",
-            }}
-          >
-            {stats.map((stat) => (
-              <div
-                key={stat.label}
-                style={{
-                  padding: "24px 16px",
-                  background: "rgba(255, 255, 255, 0.05)",
-                  textAlign: "center",
-                }}
-              >
-                <div
-                  style={{
-                    fontFamily: "var(--font-display)",
-                    fontSize: "clamp(1.5rem, 3vw, 2.5rem)",
-                    fontWeight: 800,
-                    color: "var(--color-accent)",
-                    lineHeight: 1,
-                  }}
-                >
-                  <AnimatedCounter target={stat.number} suffix={stat.suffix} />
-                </div>
-                <div style={{ fontSize: "12px", color: "rgba(255, 255, 255, 0.5)", marginTop: "4px", fontWeight: 500 }}>
-                  {stat.label}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Scroll indicator */}
-        <div
-          className="animate-fade-in-up delay-700"
-          style={{
-            position: "absolute",
-            bottom: "32px",
-            left: "50%",
-            transform: "translateX(-50%)",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: "8px",
-            animation: "float 3s ease-in-out infinite",
-          }}
-        >
-          <span style={{ fontSize: "11px", color: "rgba(255, 255, 255, 0.4)", letterSpacing: "0.1em", textTransform: "uppercase" }}>Scroll</span>
-          <IconChevronDown className="" style={{ width: "20px", height: "20px", color: "rgba(255, 255, 255, 0.4)" }} />
-        </div>
-      </section>
-
-      {/* ===================== FEATURES SECTION ===================== */}
-      <section id="features" style={{ padding: "120px 24px", maxWidth: "1280px", margin: "0 auto" }}>
-        <div style={{ textAlign: "center", marginBottom: "64px" }}>
-          <span
-            style={{
-              display: "inline-block",
-              fontSize: "13px",
-              fontWeight: 700,
-              color: "var(--color-accent)",
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              marginBottom: "16px",
-            }}
-          >
-            Platform Features
-          </span>
-          <h2
-            style={{
-              fontFamily: "var(--font-display)",
-              fontSize: "clamp(2rem, 4vw, 3rem)",
-              fontWeight: 800,
-              color: "var(--color-text-primary)",
-              marginBottom: "16px",
-            }}
-          >
-            Everything EdBlazon Needs
-          </h2>
-          <p style={{ fontSize: "18px", color: "var(--color-text-secondary)", maxWidth: "600px", margin: "0 auto" }}>
-            From event creation to finance reports — every operational aspect, unified in one platform.
-          </p>
-        </div>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-            gap: "24px",
-          }}
-        >
-          {features.map((feature) => (
-            <FeatureCard key={feature.title} feature={feature} />
-          ))}
-        </div>
-      </section>
-
-      {/* ===================== TEAMS SECTION ===================== */}
-      <section
-        id="teams"
-        style={{
-          padding: "100px 24px",
-          background: "linear-gradient(180deg, var(--color-background) 0%, var(--color-primary-50) 50%, var(--color-background) 100%)",
-        }}
+      {/* Hero Image / Dashboard Preview Placeholder */}
+      <motion.div
+        style={{ y: y1, opacity }}
+        className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2"
       >
-        <div style={{ maxWidth: "1280px", margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: "64px" }}>
-            <span
-              style={{
-                display: "inline-block",
-                fontSize: "13px",
-                fontWeight: 700,
-                color: "var(--color-accent)",
-                letterSpacing: "0.1em",
-                textTransform: "uppercase",
-                marginBottom: "16px",
-              }}
-            >
-              Competition Structure
-            </span>
-            <h2
-              style={{
-                fontFamily: "var(--font-display)",
-                fontSize: "clamp(2rem, 4vw, 3rem)",
-                fontWeight: 800,
-                color: "var(--color-text-primary)",
-                marginBottom: "16px",
-              }}
-            >
-              18 Teams, 3 Semesters
-            </h2>
-            <p style={{ fontSize: "18px", color: "var(--color-text-secondary)", maxWidth: "600px", margin: "0 auto" }}>
-              6 groups across 2nd, 4th & 6th semesters — each group fields participants from multiple departments as one unified team.
-            </p>
-          </div>
+        <div className="w-[1px] h-12 bg-slate-200" />
+        <span className="text-[10px] uppercase tracking-[0.2em] text-slate-400">Scroll</span>
+      </motion.div>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-              gap: "20px",
-            }}
-          >
-            {teams.map((team) => (
-              <div
-                key={team.group}
-                style={{
-                  padding: "28px",
-                  borderRadius: "var(--radius-lg)",
-                  background: "var(--color-surface)",
-                  border: "1px solid var(--color-border)",
-                  boxShadow: "var(--shadow-sm)",
-                  transition: "all 0.3s ease",
-                  cursor: "default",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow = "var(--shadow-lg)";
-                  e.currentTarget.style.borderColor = team.color;
-                  e.currentTarget.style.transform = "translateY(-2px)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.boxShadow = "var(--shadow-sm)";
-                  e.currentTarget.style.borderColor = "var(--color-border)";
-                  e.currentTarget.style.transform = "translateY(0)";
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "12px" }}>
-                  <div
-                    style={{
-                      width: "12px",
-                      height: "12px",
-                      borderRadius: "var(--radius-sm)",
-                      background: team.color,
-                    }}
-                  />
-                  <h3
-                    style={{
-                      fontFamily: "var(--font-display)",
-                      fontSize: "18px",
-                      fontWeight: 700,
-                      color: "var(--color-text-primary)",
-                    }}
-                  >
-                    {team.group}
-                  </h3>
-                  <span
-                    style={{
-                      marginLeft: "auto",
-                      fontSize: "12px",
-                      fontWeight: 600,
-                      color: team.color,
-                      padding: "4px 10px",
-                      borderRadius: "var(--radius-full)",
-                      background: `${team.color}15`,
-                    }}
-                  >
-                    × 3 semesters
-                  </span>
-                </div>
-                <p style={{ fontSize: "14px", color: "var(--color-text-secondary)", lineHeight: 1.6 }}>{team.depts}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ===================== ROLES SECTION ===================== */}
-      <section id="roles" style={{ padding: "100px 24px", maxWidth: "1000px", margin: "0 auto" }}>
-        <div style={{ textAlign: "center", marginBottom: "64px" }}>
-          <span
-            style={{
-              display: "inline-block",
-              fontSize: "13px",
-              fontWeight: 700,
-              color: "var(--color-accent)",
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              marginBottom: "16px",
-            }}
-          >
-            Access Control
-          </span>
-          <h2
-            style={{
-              fontFamily: "var(--font-display)",
-              fontSize: "clamp(2rem, 4vw, 3rem)",
-              fontWeight: 800,
-              color: "var(--color-text-primary)",
-              marginBottom: "16px",
-            }}
-          >
-            5-Tier Role Hierarchy
-          </h2>
-          <p style={{ fontSize: "18px", color: "var(--color-text-secondary)", maxWidth: "600px", margin: "0 auto" }}>
-            Every user sees and does only what their role permits — no more, no less.
-          </p>
-        </div>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          {roles.map((role, idx) => (
-            <div
-              key={role.title}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "20px",
-                padding: "24px 28px",
-                borderRadius: "var(--radius-lg)",
-                background: "var(--color-surface)",
-                border: "1px solid var(--color-border)",
-                boxShadow: "var(--shadow-sm)",
-                transition: "all 0.3s ease",
-                cursor: "default",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = role.color;
-                e.currentTarget.style.boxShadow = `0 4px 20px ${role.color}20`;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = "var(--color-border)";
-                e.currentTarget.style.boxShadow = "var(--shadow-sm)";
-              }}
-            >
-              <div
-                style={{
-                  width: "48px",
-                  height: "48px",
-                  borderRadius: "var(--radius-md)",
-                  background: `${role.color}15`,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                }}
-              >
-                <span style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: "20px", color: role.color }}>
-                  {idx + 1}
-                </span>
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-                  <h3 style={{ fontFamily: "var(--font-display)", fontSize: "16px", fontWeight: 700, color: "var(--color-text-primary)" }}>
-                    {role.title}
-                  </h3>
-                  <span
-                    style={{
-                      fontSize: "11px",
-                      fontWeight: 600,
-                      color: role.color,
-                      padding: "2px 8px",
-                      borderRadius: "var(--radius-full)",
-                      background: `${role.color}15`,
-                      letterSpacing: "0.05em",
-                    }}
-                  >
-                    {role.tier}
-                  </span>
-                </div>
-                <p style={{ fontSize: "14px", color: "var(--color-text-secondary)", marginTop: "4px" }}>{role.desc}</p>
-              </div>
-              <div
-                style={{
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  color: "var(--color-text-muted)",
-                  whiteSpace: "nowrap",
-                  flexShrink: 0,
-                }}
-              >
-                {role.count}
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ===================== ABOUT / CTA SECTION ===================== */}
-      <section
-        id="about"
-        style={{
-          padding: "100px 24px",
-          background: "linear-gradient(160deg, #0F2847 0%, #1A3C6E 50%, #0F2847 100%)",
-          position: "relative",
-          overflow: "hidden",
-        }}
-      >
-        <FloatingParticles />
-        <div style={{ maxWidth: "800px", margin: "0 auto", textAlign: "center", position: "relative", zIndex: 10 }}>
-          <h2
-            style={{
-              fontFamily: "var(--font-display)",
-              fontSize: "clamp(2rem, 4vw, 3rem)",
-              fontWeight: 800,
-              color: "white",
-              marginBottom: "24px",
-            }}
-          >
-            Ready to Transform EdBlazon?
-          </h2>
-          <p style={{ fontSize: "18px", color: "rgba(255, 255, 255, 0.65)", marginBottom: "40px", lineHeight: 1.7, maxWidth: "600px", margin: "0 auto 40px" }}>
-            Eliminate spreadsheets, WhatsApp chaos, and manual coordination.
-            SECONS brings your entire organizing committee onto one unified platform — built for speed, built for scale.
-          </p>
-          <div style={{ display: "flex", gap: "16px", justifyContent: "center", flexWrap: "wrap" }}>
-            <a
-              href="/login"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "16px 36px",
-                borderRadius: "var(--radius-full)",
-                background: "linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-light) 100%)",
-                color: "var(--color-text-on-accent)",
-                fontSize: "16px",
-                fontWeight: 700,
-                boxShadow: "0 4px 30px rgba(232, 160, 32, 0.35)",
-                transition: "all 0.2s",
-                cursor: "pointer",
-              }}
-            >
-              Launch SECONS
-              <IconArrowRight className="" style={{ width: "18px", height: "18px" }} />
-            </a>
-          </div>
-        </div>
-      </section>
-
-      {/* ===================== FOOTER ===================== */}
-      <footer
-        style={{
-          padding: "48px 24px 32px",
-          background: "var(--color-primary-900)",
-          borderTop: "1px solid rgba(255, 255, 255, 0.05)",
-        }}
-      >
-        <div style={{ maxWidth: "1280px", margin: "0 auto" }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              flexWrap: "wrap",
-              gap: "16px",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <div
-                style={{
-                  width: "36px",
-                  height: "36px",
-                  borderRadius: "var(--radius-md)",
-                  background: "linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <span style={{ color: "white", fontWeight: 800, fontSize: "16px", fontFamily: "var(--font-display)" }}>S</span>
-              </div>
-              <div>
-                <span style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "16px", color: "rgba(255, 255, 255, 0.9)" }}>
-                  SECONS
-                </span>
-                <span style={{ display: "block", fontSize: "11px", color: "rgba(255, 255, 255, 0.4)" }}>EdBlazon in the palm of your hands</span>
-              </div>
-            </div>
-            <p style={{ fontSize: "13px", color: "rgba(255, 255, 255, 0.3)" }}>
-              © {new Date().getFullYear()} SECONS · Built for the EdBlazon Organizing Committee
-            </p>
-          </div>
-        </div>
-      </footer>
-
-      {/* ===================== RESPONSIVE STYLES ===================== */}
-      <style jsx global>{`
-        .hide-mobile {
-          display: flex !important;
-        }
-        .show-mobile-only {
-          display: none !important;
-        }
-        .show-mobile-only svg {
-          width: 24px;
-          height: 24px;
-        }
-        @media (max-width: 768px) {
-          .hide-mobile {
-            display: none !important;
-          }
-          .show-mobile-only {
-            display: block !important;
-          }
-        }
-      `}</style>
     </div>
   );
 }
 
-/* ============================
-   FEATURE CARD COMPONENT
-   ============================ */
-function FeatureCard({ feature }: { feature: (typeof features)[number] }) {
-  const [hovered, setHovered] = useState(false);
+function FeatureCard({ feature, index }: { feature: typeof FEATURES[0], index: number }) {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, margin: "-50px" });
 
   return (
-    <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        padding: "32px",
-        borderRadius: "var(--radius-lg)",
-        background: "var(--color-surface)",
-        border: `1px solid ${hovered ? feature.color + "40" : "var(--color-border)"}`,
-        boxShadow: hovered ? `0 8px 30px ${feature.color}15` : "var(--shadow-sm)",
-        transition: "all 0.3s ease",
-        transform: hovered ? "translateY(-4px)" : "translateY(0)",
-        cursor: "default",
-      }}
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, y: 20 }}
+      animate={isInView ? { opacity: 1, y: 0 } : {}}
+      transition={{ duration: 0.5, delay: index * 0.1 }}
+      className={cn(
+        "group relative overflow-hidden rounded-2xl border border-slate-100 bg-white p-8 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300",
+        feature.className
+      )}
     >
-      <div
-        style={{
-          width: "52px",
-          height: "52px",
-          borderRadius: "var(--radius-md)",
-          background: `${feature.color}12`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          marginBottom: "20px",
-          transition: "all 0.3s ease",
-          transform: hovered ? "scale(1.1)" : "scale(1)",
-        }}
-      >
-        <feature.icon
-          className=""
-          {...{ style: { width: "24px", height: "24px", color: feature.color } } as Record<string, unknown>}
-        />
+      <div className="relative z-10 flex flex-col h-full">
+        <div className="mb-5 inline-flex size-12 items-center justify-center rounded-xl bg-primary/5 text-primary border border-primary/10 group-hover:bg-primary group-hover:text-white transition-colors duration-300">
+          <feature.icon className="size-6" />
+        </div>
+        <h3 className="font-display font-bold text-xl text-primary-900 mb-3 tracking-tight">{feature.title}</h3>
+        <p className="text-slate-500 leading-relaxed text-sm">{feature.description}</p>
       </div>
-      <h3
-        style={{
-          fontFamily: "var(--font-display)",
-          fontSize: "18px",
-          fontWeight: 700,
-          color: "var(--color-text-primary)",
-          marginBottom: "8px",
-        }}
+    </motion.div>
+  );
+}
+
+function SectionHeading({ title, subtitle, label }: { title: string, subtitle: string, label: string }) {
+  return (
+    <div className="text-center mb-16 md:mb-20">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-bold uppercase tracking-widest mb-4"
       >
-        {feature.title}
-      </h3>
-      <p style={{ fontSize: "14px", color: "var(--color-text-secondary)", lineHeight: 1.7 }}>
-        {feature.description}
-      </p>
+        {label}
+      </motion.div>
+      <motion.h2
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ delay: 0.1 }}
+        className="font-display font-black text-3xl md:text-5xl text-primary-900 mb-4"
+      >
+        {title}
+      </motion.h2>
+      <motion.p
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ delay: 0.2 }}
+        className="text-lg text-slate-500 max-w-2xl mx-auto"
+      >
+        {subtitle}
+      </motion.p>
+    </div>
+  );
+}
+
+function FeaturedEvents() {
+  const [events, setEvents] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch("/api/events?limit=3&status=published")
+      .then(r => r.json())
+      .then(d => d.success && setEvents(d.data.events))
+      .catch(() => { });
+  }, []);
+
+  if (events.length === 0) return null;
+
+  return (
+    <section id="events" className="py-24 relative bg-white border-t border-slate-100">
+      <div className="max-w-7xl mx-auto px-6">
+        <SectionHeading label="Happening Now" title="Featured Events" subtitle="Explore the latest highlights from the festival schedule." />
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {events.map((ev, i) => (
+            <motion.div
+              key={ev._id}
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: i * 0.1 }}
+            >
+              <Card className="h-full border-slate-100 shadow-sm hover:shadow-lg transition-all overflow-hidden group">
+                <div className="aspect-video relative overflow-hidden bg-slate-100">
+                  {ev.flierUrl ? (
+                    <img src={ev.flierUrl} alt={ev.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-slate-400"><CalendarDays className="size-10 opacity-50" /></div>
+                  )}
+                  <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-primary shadow-sm uppercase tracking-wide border border-slate-100">
+                    {ev.jgaDomain.replace(/_/g, " ")}
+                  </div>
+                </div>
+                <CardContent className="p-6">
+                  <h3 className="text-xl font-bold text-primary-900 mb-2 line-clamp-1">{ev.title}</h3>
+                  <div className="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <MapIcon className="size-4" /> {ev.venue}
+                  </div>
+                  {ev.registrationLink && (
+                    <a href={ev.registrationLink} target="_blank" rel="noopener noreferrer">
+                      <Button className="w-full bg-primary hover:bg-primary-700 text-white shadow-sm">
+                        Register Now
+                      </Button>
+                    </a>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
+        </div>
+
+        <div className="text-center mt-12">
+          <Link href="/all-events">
+            <Button variant="outline" size="lg" className="rounded-full border-slate-200 text-primary-900 hover:bg-slate-50">
+              View All Events <ArrowRight className="ml-2 size-4" />
+            </Button>
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export default function LandingPage() {
+  return (
+    <div className="bg-[#F8F9FB] min-h-screen text-slate-900 selection:bg-primary/10">
+      <Navbar />
+      <Hero />
+
+      {/* Features Section */}
+      <section id="features" className="py-24 relative">
+        <div className="max-w-7xl mx-auto px-6">
+          <SectionHeading label="Platform Features" title="Built for Scale" subtitle="The unified operating system for the EdBlazon committee." />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {FEATURES.map((feature, i) => (
+              <FeatureCard key={i} feature={feature} index={i} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Teams Section */}
+      <section id="teams" className="py-24 bg-white border-y border-slate-100">
+        <div className="max-w-7xl mx-auto px-6">
+          <SectionHeading label="Computation" title="18 Teams. One Trophy." subtitle="Unified scoring across Sports, Cultural, and Literary events." />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {TEAMS.map((team, i) => (
+              <motion.div
+                key={team.group}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+                className="group p-6 rounded-2xl bg-[#F8F9FB] border border-slate-100 hover:border-slate-200 hover:shadow-md transition-all cursor-default"
+              >
+                <div className="flex items-center gap-4 mb-3">
+                  <div className={cn("size-3 rounded-full shadow-sm ring-2 ring-white", team.color)} />
+                  <h3 className="font-display font-bold text-lg text-primary-900">{team.group}</h3>
+                </div>
+                <p className="text-sm text-slate-500 font-medium">{team.depts}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Roles Section */}
+      <section id="roles" className="py-24 relative">
+        <div className="max-w-5xl mx-auto px-6">
+          <SectionHeading label="Hierarchy" title="Role-Based Access" subtitle="Strict permission controls ensuring data security." />
+
+          <div className="space-y-4">
+            {ROLES.map((role, i) => (
+              <motion.div
+                key={role.title}
+                initial={{ opacity: 0, x: -10 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+                className={cn(
+                  "flex items-center justify-between p-5 rounded-2xl border bg-white shadow-sm hover:shadow-md transition-all",
+                  role.border
+                )}
+              >
+                <div className="flex items-center gap-6">
+                  <div className={cn("size-10 rounded-xl flex items-center justify-center font-bold font-display text-lg", role.bg, role.color)}>
+                    {i + 1}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-lg text-primary-900">{role.title}</h3>
+                    <p className="text-sm text-slate-500">{role.desc}</p>
+                  </div>
+                </div>
+                <Badge variant="outline" className={cn("hidden sm:flex border bg-white", role.color, role.border)}>
+                  {role.tier}
+                </Badge>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <FeaturedEvents />
+
+      {/* CTA Section */}
+      <section className="py-32 relative overflow-hidden bg-primary text-white">
+        {/* Background Patterns */}
+        <div className="absolute inset-0 z-0 opacity-10">
+          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-white rounded-full blur-[150px] -translate-y-1/2 translate-x-1/4" />
+          <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-amber-500 rounded-full blur-[150px] translate-y-1/2 -translate-x-1/4" />
+        </div>
+
+        <div className="max-w-4xl mx-auto px-6 text-center relative z-10">
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="font-display font-black text-5xl md:text-6xl text-white mb-8"
+          >
+            Ready to streamline <br /> <span className="text-amber-300">EdBlazon 2026?</span>
+          </motion.h2>
+          <p className="text-xl text-primary-100 mb-10 max-w-2xl mx-auto">
+            Join the committee portal and start managing your events today.
+          </p>
+          <Link href="/login">
+            <Button size="lg" className="h-16 px-10 rounded-full text-lg font-bold bg-white text-primary hover:bg-slate-100 transition-transform hover:scale-105 shadow-xl">
+              Launch Platform
+            </Button>
+          </Link>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t border-slate-200 bg-white py-12">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex items-center gap-3">
+            <div className="size-8 rounded-lg bg-primary flex items-center justify-center text-white shadow-sm">
+              <span className="font-display font-bold text-sm">S</span>
+            </div>
+            <span className="text-slate-500 text-sm">© {(new Date()).getFullYear()} SECONS. All rights reserved.</span>
+          </div>
+          <div className="flex gap-6 text-sm text-slate-500">
+            <a href="#" className="hover:text-primary transition-colors">Privacy</a>
+            <a href="#" className="hover:text-primary transition-colors">Terms</a>
+            <a href="#" className="hover:text-primary transition-colors">Contact</a>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

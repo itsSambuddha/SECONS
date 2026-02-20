@@ -6,14 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Mail, MessageCircle, Copy, Check, Clock, RefreshCw } from "lucide-react";
 import toast from "react-hot-toast";
@@ -159,39 +151,39 @@ export function RecentInvites() {
                 </CardHeader>
                 <CardContent>
                     <div className="rounded-md border border-white/10 overflow-hidden">
-                        <Table>
-                            <TableHeader className="bg-primary/5">
-                                <TableRow>
-                                    <TableHead>Code</TableHead>
-                                    <TableHead>Role/Domain</TableHead>
-                                    <TableHead>Created</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-primary/5 text-muted-foreground font-medium border-b border-white/10">
+                                <tr>
+                                    <th className="px-4 py-3">Code</th>
+                                    <th className="px-4 py-3">Role/Domain</th>
+                                    <th className="px-4 py-3">Created</th>
+                                    <th className="px-4 py-3">Status</th>
+                                    <th className="px-4 py-3 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/5">
                                 {invites.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                                    <tr>
+                                        <td colSpan={5} className="text-center py-8 text-muted-foreground">
                                             No recent invitations found.
-                                        </TableCell>
-                                    </TableRow>
+                                        </td>
+                                    </tr>
                                 ) : (
                                     invites.map((invite) => (
-                                        <TableRow key={invite._id} className="hover:bg-white/5">
-                                            <TableCell className="font-mono font-bold text-primary">
+                                        <tr key={invite._id} className="hover:bg-white/5 transition-colors">
+                                            <td className="px-4 py-3 font-mono font-bold text-primary">
                                                 {invite.token}
-                                            </TableCell>
-                                            <TableCell>
+                                            </td>
+                                            <td className="px-4 py-3">
                                                 <div className="flex flex-col">
                                                     <span className="font-medium capitalize">{invite.role}</span>
                                                     <span className="text-xs text-muted-foreground capitalize">{invite.domain}</span>
                                                 </div>
-                                            </TableCell>
-                                            <TableCell className="text-xs text-muted-foreground">
+                                            </td>
+                                            <td className="px-4 py-3 text-xs text-muted-foreground">
                                                 {format(new Date(invite.createdAt), "MMM d, HH:mm")}
-                                            </TableCell>
-                                            <TableCell>
+                                            </td>
+                                            <td className="px-4 py-3">
                                                 {invite.used ? (
                                                     <Badge variant="secondary" className="bg-green-100 text-green-700 hover:bg-green-200">Used</Badge>
                                                 ) : (
@@ -200,8 +192,8 @@ export function RecentInvites() {
                                                         {invite.lastEmailedAt && <Badge variant="secondary" className="text-[10px]">Emailed</Badge>}
                                                     </div>
                                                 )}
-                                            </TableCell>
-                                            <TableCell className="text-right">
+                                            </td>
+                                            <td className="px-4 py-3 text-right">
                                                 <div className="flex justify-end gap-1">
                                                     <Button
                                                         variant="ghost"
@@ -236,12 +228,12 @@ export function RecentInvites() {
                                                         </>
                                                     )}
                                                 </div>
-                                            </TableCell>
-                                        </TableRow>
+                                            </td>
+                                        </tr>
                                     ))
                                 )}
-                            </TableBody>
-                        </Table>
+                            </tbody>
+                        </table>
                     </div>
                 </CardContent>
             </Card>

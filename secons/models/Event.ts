@@ -6,7 +6,7 @@ import mongoose, { Schema, type Document } from "mongoose";
 
 export interface IEvent extends Document {
     title: string;
-    category: "sports" | "literary" | "performing_creative_arts" | "club" | "miscellaneous";
+    category: string;
     description: string;
     rules?: string;
     eligibility?: string;
@@ -14,7 +14,7 @@ export interface IEvent extends Document {
     startDateTime: Date;
     endDateTime: Date;
     flierUrl?: string;
-    registrationLink?: string;
+    registrationLink: string;
     status: "draft" | "published" | "ongoing" | "completed" | "cancelled";
     cancellationReason?: string;
     animatorId: mongoose.Types.ObjectId;
@@ -30,8 +30,8 @@ const eventSchema = new Schema<IEvent>(
         title: { type: String, required: true, trim: true },
         category: {
             type: String,
-            enum: ["sports", "literary", "performing_creative_arts", "club", "miscellaneous"],
             required: true,
+            trim: true,
             index: true,
         },
         description: { type: String, required: true },
@@ -41,7 +41,7 @@ const eventSchema = new Schema<IEvent>(
         startDateTime: { type: Date, required: true },
         endDateTime: { type: Date, required: true },
         flierUrl: { type: String },
-        registrationLink: { type: String },
+        registrationLink: { type: String, required: true },
         status: {
             type: String,
             enum: ["draft", "published", "ongoing", "completed", "cancelled"],
