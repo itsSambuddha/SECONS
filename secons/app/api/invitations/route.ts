@@ -58,9 +58,9 @@ export async function POST(req: NextRequest) {
         const body = await req.json();
         const { name, email, role, domain } = body;
 
-        if (!name || !email || !role) {
+        if (!role) {
             return NextResponse.json<ApiResponse<null>>(
-                { success: false, error: "Name, email, and role are required" },
+                { success: false, error: "Role is required" },
                 { status: 400 }
             );
         }
@@ -83,26 +83,28 @@ export async function POST(req: NextRequest) {
 
         await connectDB();
 
-        // Check if email already has an account
-        const existingUser = await User.findOne({ email: email.toLowerCase() }).lean();
-        if (existingUser) {
-            return NextResponse.json<ApiResponse<null>>(
-                { success: false, error: "This email already has an account" },
-                { status: 409 }
-            );
-        }
+        // Check if email already has an account (only if email provided)
+        if (email) {
+            const existingUser = await User.findOne({ email: email.toLowerCase() }).lean();
+            if (existingUser) {
+                return NextResponse.json<ApiResponse<null>>(
+                    { success: false, error: "This email already has an account" },
+                    { status: 409 }
+                );
+            }
 
-        // Check for an unused pending invitation for this email
-        const existingInvite = await InvitationToken.findOne({
-            email: email.toLowerCase(),
-            used: false,
-            expiresAt: { $gt: new Date() },
-        }).lean();
-        if (existingInvite) {
-            return NextResponse.json<ApiResponse<null>>(
-                { success: false, error: "A pending invitation already exists for this email" },
-                { status: 409 }
-            );
+            // Check for an unused pending invitation for this email
+            const existingInvite = await InvitationToken.findOne({
+                email: email.toLowerCase(),
+                used: false,
+                expiresAt: { $gt: new Date() },
+            }).lean();
+            if (existingInvite) {
+                return NextResponse.json<ApiResponse<null>>(
+                    { success: false, error: "A pending invitation already exists for this email" },
+                    { status: 409 }
+                );
+            }
         }
 
         // Generate 6-char access code
@@ -116,32 +118,35 @@ export async function POST(req: NextRequest) {
 
         const invitation = await InvitationToken.create({
             token: accessCode,
-            email: email.toLowerCase().trim(),
-            name: name.trim(),
+            email: email ? email.toLowerCase().trim() : undefined,
+            name: name ? name.trim() : "Pending User", // Placeholder for code-only invites
             role: targetRole,
             domain: domain || "general",
             invitedBy: inviter ? String(inviter._id) : decoded.uid,
             expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000), // 48 hours
         });
 
-        // Send email with both code and direct link
+        // Send email with both code and direct link (only if email provided)
         const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/login?code=${accessCode}`;
-        try {
-            await sendInvitationEmail(email, {
-                inviteeName: name,
-                role: targetRole,
-                domain: domain || "general",
-                inviterName: inviter?.name || "SECONS Admin",
-                acceptUrl: loginUrl,
-                accessCode: accessCode,
-            });
-        } catch (emailError) {
-            console.error("Failed to send invitation email:", emailError);
+
+        if (email) {
+            try {
+                await sendInvitationEmail(email, {
+                    inviteeName: name || "Future Member",
+                    role: targetRole,
+                    domain: domain || "general",
+                    inviterName: inviter?.name || "SECONS Admin",
+                    acceptUrl: loginUrl,
+                    accessCode: accessCode,
+                });
+            } catch (emailError) {
+                console.error("Failed to send invitation email:", emailError);
+            }
         }
 
         await logAuth("USER_CREATED", "INFO", inviter ? String(inviter._id) : decoded.uid, {
             action: "INVITATION_SENT",
-            targetEmail: email,
+            targetEmail: email || "access-code-only",
             targetRole,
             code: accessCode,
         });

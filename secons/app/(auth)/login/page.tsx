@@ -55,13 +55,17 @@ function LoginForm() {
     useEffect(() => {
         if (authLoading) return;
 
+        // If user is logged in, but has an access code (invite flow), DO NOT Redirect.
+        // Let the UI prompt them to sign out.
         if (user) {
-            router.replace(user.onboardingComplete ? "/dashboard" : "/onboarding");
+            if (!accessCode && step !== "invite-ready") {
+                router.replace(user.onboardingComplete ? "/dashboard" : "/onboarding");
+            }
         } else if (firebaseUser && step !== "ga-register" && step !== "invite-ready") {
             // Signed in to Google, but no account in our system
             setStep("unauthorized");
         }
-    }, [user, firebaseUser, authLoading, router, step]);
+    }, [user, firebaseUser, authLoading, router, step, accessCode]);
 
     // Validate 6-char access code
     const validateCode = async (code: string) => {
@@ -159,6 +163,14 @@ function LoginForm() {
         } finally {
             setLoading(false);
         }
+    };
+
+    // Explicit Sign Out & Accept wrapper
+    const handleSignOutAndAccept = async () => {
+        setLoading(true);
+        await signOut();
+        setLoading(false);
+        // User is now signed out. They can click "Sign in with Google" again.
     };
 
     // Handle Standard Sign-In (Existing User)
@@ -284,21 +296,49 @@ function LoginForm() {
                         }}>
                             <strong>✅ Valid Invitation</strong>
                             <br />
-                            Access code verified for <strong>{inviteInfo.role.toUpperCase()}</strong> role.
+                            Access code for <strong>{inviteInfo.role.toUpperCase()}</strong> ({inviteInfo.domain}).
                         </div>
+
+                        {user ? (
+                            <div style={{
+                                background: "#FFF7ED", border: "1px solid #FED7AA", borderRadius: "12px",
+                                padding: "16px", marginBottom: "24px", fontSize: "13px", color: "#C2410C",
+                            }}>
+                                <strong>⚠️ Already Signed In</strong>
+                                <br />
+                                You are signed in as <strong>{user.email}</strong>.
+                                To accept this invite for a <em>new account</em>, please sign out first.
+                            </div>
+                        ) : null}
+
+                        {user ? (
+                            <button
+                                onClick={handleSignOutAndAccept}
+                                disabled={loading}
+                                style={buttonStyle(false)}
+                            >
+                                {loading ? "Signing out..." : "Sign Out to Accept Invite"}
+                            </button>
+                        ) : (
+                            <button
+                                onClick={handleAcceptInvite}
+                                disabled={loading}
+                                style={buttonStyle(false)}
+                            >
+                                <GoogleIcon />
+                                {loading ? "Assigning Role..." : "Sign in with Google"}
+                            </button>
+                        )}
+
                         <button
-                            onClick={handleAcceptInvite}
-                            disabled={loading}
-                            style={buttonStyle(false)}
-                        >
-                            <GoogleIcon />
-                            {loading ? "Assigning Role..." : "Sign in with Google"}
-                        </button>
-                        <button
-                            onClick={() => setStep("gateway")}
+                            onClick={() => {
+                                setAccessCode("");
+                                setStep("gateway");
+                                // If logged in, this will trigger the useEffect redirect
+                            }}
                             style={{ ...linkButtonStyle, display: "block", margin: "16px auto 0", fontSize: "12px" }}
                         >
-                            Use a different code
+                            {user ? "Go to Dashboard" : "Use a different code"}
                         </button>
                     </>
                 )}

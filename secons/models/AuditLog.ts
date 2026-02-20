@@ -29,7 +29,7 @@ const auditLogSchema = new Schema<IAuditLog>(
         details: { type: Schema.Types.Mixed, default: {} },
         ipAddress: { type: String },
         userAgent: { type: String },
-        createdAt: { type: Date, default: Date.now, index: true },
+        createdAt: { type: Date, default: Date.now },
     },
     {
         timestamps: false,
@@ -40,6 +40,11 @@ const auditLogSchema = new Schema<IAuditLog>(
 // TTL: auto-delete after 1 year
 auditLogSchema.index({ createdAt: 1 }, { expireAfterSeconds: 365 * 24 * 60 * 60 });
 auditLogSchema.index({ eventType: 1, createdAt: -1 });
+
+// Force model recompilation in dev to catch schema changes
+if (process.env.NODE_ENV === "development") {
+    delete mongoose.models.AuditLog;
+}
 
 export const AuditLog = mongoose.models.AuditLog || mongoose.model<IAuditLog>("AuditLog", auditLogSchema);
 export default AuditLog;

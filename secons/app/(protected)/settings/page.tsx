@@ -25,6 +25,8 @@ export default function SettingsPage() {
 
     // Profile update
     const [name, setName] = useState(user?.name || "");
+    const [phoneNumber, setPhoneNumber] = useState(user?.phoneNumber || "");
+    const [whatsappNumber, setWhatsappNumber] = useState(user?.whatsappNumber || "");
     const [photoURL, setPhotoURL] = useState(user?.photoURL || "");
     const [photoPreview, setPhotoPreview] = useState(user?.photoURL || "");
     const [uploading, setUploading] = useState(false);
@@ -88,7 +90,7 @@ export default function SettingsPage() {
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${token}`,
                 },
-                body: JSON.stringify({ name, photoURL }),
+                body: JSON.stringify({ name, photoURL, phoneNumber, whatsappNumber }),
             });
             const data = await res.json();
             if (data.success) {
@@ -239,6 +241,53 @@ export default function SettingsPage() {
                                 boxSizing: "border-box",
                             }}
                         />
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
+                        <div>
+                            <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#1A1A2E", marginBottom: "6px" }}>
+                                Phone Number
+                            </label>
+                            <div style={{ position: "relative" }}>
+                                <span style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", color: "#6B7280", fontSize: "14px", fontWeight: 500, pointerEvents: "none" }}>+91</span>
+                                <input
+                                    type="tel"
+                                    value={phoneNumber.replace(/^\+91/, "")}
+                                    onChange={(e) => {
+                                        const val = e.target.value.replace(/[^0-9]/g, "");
+                                        if (val.length <= 10) setPhoneNumber("+91" + val);
+                                    }}
+                                    placeholder="9876543210"
+                                    style={{
+                                        width: "100%", padding: "10px 14px 10px 50px", borderRadius: "10px",
+                                        border: "1px solid #E2E8F0", fontSize: "14px", outline: "none",
+                                        boxSizing: "border-box", fontFamily: "monospace", fontWeight: 600
+                                    }}
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#1A1A2E", marginBottom: "6px" }}>
+                                WhatsApp Number
+                            </label>
+                            <div style={{ position: "relative" }}>
+                                <span style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", color: "#6B7280", fontSize: "14px", fontWeight: 500, pointerEvents: "none" }}>+91</span>
+                                <input
+                                    type="tel"
+                                    value={whatsappNumber.replace(/^\+91/, "")}
+                                    onChange={(e) => {
+                                        const val = e.target.value.replace(/[^0-9]/g, "");
+                                        if (val.length <= 10) setWhatsappNumber("+91" + val);
+                                    }}
+                                    placeholder="9876543210"
+                                    style={{
+                                        width: "100%", padding: "10px 14px 10px 50px", borderRadius: "10px",
+                                        border: "1px solid #E2E8F0", fontSize: "14px", outline: "none",
+                                        boxSizing: "border-box", fontFamily: "monospace", fontWeight: 600
+                                    }}
+                                />
+                            </div>
+                        </div>
                     </div>
 
                     <div style={{

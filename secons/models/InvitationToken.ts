@@ -12,6 +12,7 @@ export interface IInvitationToken extends Document {
     domain: string;
     invitedBy: string; // User ID of inviter
     used: boolean;
+    lastEmailedAt?: Date;
     expiresAt: Date;
     createdAt: Date;
 }
@@ -19,8 +20,8 @@ export interface IInvitationToken extends Document {
 const invitationTokenSchema = new Schema<IInvitationToken>(
     {
         token: { type: String, required: true, unique: true, uppercase: true },
-        email: { type: String, required: true, lowercase: true, trim: true },
-        name: { type: String, required: true, trim: true },
+        email: { type: String, lowercase: true, trim: true },
+        name: { type: String, trim: true },
         role: {
             type: String,
             enum: ["jga", "animator", "volunteer", "student"],
@@ -29,6 +30,7 @@ const invitationTokenSchema = new Schema<IInvitationToken>(
         domain: { type: String, default: "general" },
         invitedBy: { type: String, required: true },
         used: { type: Boolean, default: false },
+        lastEmailedAt: { type: Date },
         expiresAt: { type: Date, required: true },
     },
     {
@@ -40,7 +42,11 @@ const invitationTokenSchema = new Schema<IInvitationToken>(
 // TTL index: auto-delete after expiry + 24h grace period
 invitationTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 86400 });
 invitationTokenSchema.index({ email: 1, used: 1 });
-invitationTokenSchema.index({ token: 1 });
+
+// Force model recompilation in dev to catch schema changes
+if (process.env.NODE_ENV === "development") {
+    delete mongoose.models.InvitationToken;
+}
 
 export const InvitationToken =
     mongoose.models.InvitationToken ||

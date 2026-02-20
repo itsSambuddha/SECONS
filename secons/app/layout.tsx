@@ -1,18 +1,12 @@
 import type { Metadata } from "next";
-import { Inter, Syne } from "next/font/google";
+import { Lexend } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/components/providers/AuthProvider";
 import { Toaster } from "react-hot-toast";
 import "./globals.css";
 
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-  display: "swap",
-});
-
-const syne = Syne({
-  variable: "--font-syne",
+const lexend = Lexend({
+  variable: "--font-lexend",
   subsets: ["latin"],
   display: "swap",
 });
@@ -46,7 +40,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${inter.variable} ${syne.variable} antialiased`}
+        className={`${lexend.variable} antialiased`}
         style={{ fontFamily: "var(--font-body)" }}
       >
         <TooltipProvider>
