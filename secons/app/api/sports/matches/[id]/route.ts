@@ -5,6 +5,7 @@ import User from "@/models/User";
 import Notification from "@/models/Notification";
 import Team from "@/models/Team";
 import Fixture from "@/models/Fixture";
+import Event from "@/models/Event";
 import { withAuth } from "@/lib/withAuth";
 
 /**
@@ -108,14 +109,38 @@ export const PATCH = withAuth(async (req, { params, user }) => {
             { new: true, runValidators: true }
         ).populate("team1Id", "name").populate("team2Id", "name");
 
+        if (!updatedMatch) {
+            return NextResponse.json({ success: false, error: "Failed to update match" }, { status: 500 });
+        }
+
         // Notify all users if score or status changed
         if (body.scoreTeam1 !== undefined || body.scoreTeam2 !== undefined || body.status) {
+            // Also sync the parent Event status if Match status changed
+            if (body.status && updatedMatch.sportEventId) {
+                let eventStatus: string | undefined;
+                if (body.status === "live") {
+                    eventStatus = "ongoing";
+                } else if (body.status === "completed") {
+                    // Check if any other matches for this event are still live
+                    const otherLiveMatches = await Match.findOne({
+                        sportEventId: updatedMatch.sportEventId,
+                        _id: { $ne: id },
+                        status: "live"
+                    });
+                    if (!otherLiveMatches) eventStatus = "completed";
+                } else if (body.status === "scheduled") {
+                    eventStatus = "published";
+                }
+
+                if (eventStatus) {
+                    await Event.findByIdAndUpdate(updatedMatch.sportEventId, { status: eventStatus });
+                }
+            }
+
             const allUsers = await User.find({ uid: { $ne: user.uid }, isActive: true }).select("uid").lean();
             if (allUsers.length > 0) {
-                // @ts-ignore
-                const team1Name = updatedMatch?.team1Id?.name || "Team 1";
-                // @ts-ignore
-                const team2Name = updatedMatch?.team2Id?.name || "Team 2";
+                const team1Name = updatedMatch.team1Id && (updatedMatch.team1Id as any).name ? (updatedMatch.team1Id as any).name : "Team 1";
+                const team2Name = updatedMatch.team2Id && (updatedMatch.team2Id as any).name ? (updatedMatch.team2Id as any).name : "Team 2";
 
                 const notifications = allUsers.map(u => ({
                     userId: u.uid,
@@ -123,7 +148,7 @@ export const PATCH = withAuth(async (req, { params, user }) => {
                     title: `Match Update: ${team1Name} vs ${team2Name}`,
                     body: body.status
                         ? `Match status changed to ${body.status}`
-                        : `Score updated: ${updatedMatch?.scoreTeam1} - ${updatedMatch?.scoreTeam2}`,
+                        : `Score updated: ${updatedMatch.scoreTeam1} - ${updatedMatch.scoreTeam2}`,
                     link: `/sports`,
                 }));
                 await Notification.insertMany(notifications).catch(err => console.error("Failed to insert match notifications", err));

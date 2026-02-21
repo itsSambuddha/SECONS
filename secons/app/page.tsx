@@ -12,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import Footer from "@/components/layout/Footer";
 
 /* ============================
    CONSTANTS & DATA
@@ -42,18 +43,32 @@ const FEATURES = [
 function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [hidden, setHidden] = useState(false);
+  const { scrollY } = useScroll();
+  const lastScrollY = useRef(0);
 
   useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", handleScroll);
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      setScrolled(currentScrollY > 20);
+
+      if (currentScrollY > lastScrollY.current && currentScrollY > 150) {
+        setHidden(true);
+      } else {
+        setHidden(false);
+      }
+      lastScrollY.current = currentScrollY;
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   return (
     <motion.nav
       initial={{ y: -100 }}
-      animate={{ y: 0 }}
-      transition={{ duration: 0.5 }}
+      animate={{ y: hidden ? -100 : 0 }}
+      transition={{ duration: 0.3, ease: "easeInOut" }}
       className={cn(
         "fixed top-0 left-0 right-0 z-50 transition-all duration-300 border-b",
         scrolled
@@ -220,9 +235,21 @@ function FeaturedEvents() {
   const [events, setEvents] = useState<any[]>([]);
 
   useEffect(() => {
-    fetch("/api/events?limit=3&status=published")
+    fetch("/api/events?limit=10&status=published")
       .then(r => r.json())
-      .then(d => d.success && setEvents(d.data.events))
+      .then(d => {
+        if (d.success) {
+          const filtered = d.data.events.filter((ev: any) => {
+            if (ev.jgaDomain === "sports") {
+              const hasLink = ev.registrationLink && ev.registrationLink !== "N/A" && ev.registrationLink.trim() !== "";
+              const isLive = ev.status === "ongoing";
+              return hasLink || isLive;
+            }
+            return true;
+          }).slice(0, 3);
+          setEvents(filtered);
+        }
+      })
       .catch(() => { });
   }, []);
 
@@ -232,39 +259,80 @@ function FeaturedEvents() {
         <SectionHeading label="Circuit Feed" title="Featured Events" subtitle="The highlights from the SECONS schedule." />
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {events.length > 0 ? events.map((ev, i) => (
-            <motion.div
-              key={ev._id}
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.1 }}
-            >
-              <Card className="h-full rounded-[2.5rem] border-slate-100 shadow-xl hover:shadow-2xl transition-all overflow-hidden group">
-                <div className="aspect-[4/5] relative overflow-hidden bg-slate-100">
-                  {ev.flierUrl ? (
-                    <img src={ev.flierUrl} alt={ev.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-                  ) : (
-                    <div className="flex items-center justify-center h-full text-slate-200"><CalendarDays className="size-20" /></div>
-                  )}
-                  <div className="absolute top-6 right-6 bg-white shadow-xl px-4 py-1.5 rounded-2xl text-[10px] font-black text-primary uppercase tracking-widest border border-slate-50">
-                    {ev.jgaDomain.replace(/_/g, " ")}
+          {events.length > 0 ? events.map((ev, i) => {
+            const isSportsLive = ev.jgaDomain === "sports" && ev.status === "ongoing";
+            const hasLink = ev.registrationLink && ev.registrationLink !== "N/A" && ev.registrationLink.trim() !== "";
+
+            return (
+              <motion.div
+                key={ev._id}
+                initial={{ opacity: 0, y: 40 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+              >
+                <Card className="h-full rounded-[2.5rem] border-slate-100 shadow-xl hover:shadow-2xl transition-all overflow-hidden group">
+                  <div className="aspect-[4/5] relative overflow-hidden bg-slate-100">
+                    {ev.flierUrl ? (
+                      <img src={ev.flierUrl} alt={ev.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-slate-200"><CalendarDays className="size-20" /></div>
+                    )}
+                    <div className="absolute top-6 right-6 bg-white shadow-xl px-4 py-1.5 rounded-2xl text-[10px] font-black text-primary uppercase tracking-widest border border-slate-50">
+                      {ev.jgaDomain.replace(/_/g, " ")}
+                    </div>
+                    {isSportsLive && (
+                      <div className="absolute top-6 left-6 bg-red-500 shadow-xl px-4 py-1.5 rounded-2xl text-[10px] font-black text-white uppercase tracking-widest animate-pulse">
+                        Ongoing
+                      </div>
+                    )}
                   </div>
-                </div>
-                <CardContent className="p-8">
-                  <h3 className="text-2xl font-display font-black text-slate-900 mb-3 uppercase italic tracking-tighter">{ev.title}</h3>
-                  <p className="text-slate-400 font-mono text-[10px] uppercase tracking-widest mt-1 mb-8 opacity-60">Venue: {ev.venue}</p>
-                  {ev.registrationLink && (
-                    <a href={ev.registrationLink} target="_blank" rel="noopener noreferrer">
-                      <Button className="w-full h-12 rounded-2xl bg-slate-100 text-slate-900 hover:bg-primary hover:text-white font-black uppercase tracking-widest text-[11px] transition-all">
-                        Register Interest
-                      </Button>
-                    </a>
-                  )}
-                </CardContent>
-              </Card>
-            </motion.div>
-          )) : (
+                  <CardContent className="p-8">
+                    <h3 className="text-2xl font-display font-black text-slate-900 mb-3 uppercase italic tracking-tighter">{ev.title}</h3>
+                    <p className="text-slate-400 font-mono text-[10px] uppercase tracking-widest mt-1 mb-8 opacity-60">Venue: {ev.venue}</p>
+
+                    <div className="block">
+                      {ev.jgaDomain === "sports" ? (
+                        <>
+                          {ev.status === "ongoing" ? (
+                            <Link href="/live">
+                              <Button className="w-full h-12 rounded-2xl bg-red-600 text-white hover:bg-red-700 font-black uppercase tracking-widest text-[11px] transition-all flex items-center justify-center gap-2">
+                                <Activity className="size-4" /> See Live Scores
+                              </Button>
+                            </Link>
+                          ) : ev.status === "completed" ? (
+                            <Button disabled className="w-full h-12 rounded-2xl bg-slate-100 text-slate-400 font-black uppercase tracking-widest text-[11px] cursor-not-allowed">
+                              Completed
+                            </Button>
+                          ) : hasLink ? (
+                            <a href={ev.registrationLink} target="_blank" rel="noopener noreferrer">
+                              <Button className="w-full h-12 rounded-2xl bg-slate-100 text-slate-900 hover:bg-primary hover:text-white font-black uppercase tracking-widest text-[11px] transition-all">
+                                Register Interest
+                              </Button>
+                            </a>
+                          ) : null}
+                        </>
+                      ) : (
+                        <>
+                          {(ev.status === "ongoing" || ev.status === "completed") ? (
+                            <Button disabled className="w-full h-12 rounded-2xl bg-slate-100 text-slate-400 font-black uppercase tracking-widest text-[11px] cursor-not-allowed leading-tight px-4">
+                              Registration Closed / Event Completed
+                            </Button>
+                          ) : hasLink ? (
+                            <a href={ev.registrationLink} target="_blank" rel="noopener noreferrer">
+                              <Button className="w-full h-12 rounded-2xl bg-slate-100 text-slate-900 hover:bg-primary hover:text-white font-black uppercase tracking-widest text-[11px] transition-all">
+                                Register Interest
+                              </Button>
+                            </a>
+                          ) : null}
+                        </>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            );
+          }) : (
             <div className="col-span-full py-20 text-center opacity-20 font-display font-black text-3xl uppercase italic">No public events listed yet.</div>
           )}
         </div>
@@ -339,25 +407,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-slate-100 bg-white py-16">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-12">
-          <div className="flex items-center gap-4">
-            <div className="size-12 rounded-2xl bg-slate-900 flex items-center justify-center text-white shadow-xl">
-              <span className="font-display font-bold text-xl">S</span>
-            </div>
-            <div>
-              <p className="font-display font-black text-lg tracking-tight uppercase leading-none">SECONS 2026</p>
-              <p className="text-[10px] font-mono uppercase tracking-widest text-slate-400 mt-1 mt-1">St. Xavier's College (Autonomous)</p>
-            </div>
-          </div>
-          <div className="flex gap-12 text-[11px] font-mono font-black uppercase tracking-[0.2em] text-slate-400">
-            <a href="#" className="hover:text-primary transition-colors">Privacy</a>
-            <a href="#" className="hover:text-primary transition-colors">Terms</a>
-            <a href="#" className="hover:text-primary transition-colors">Contact</a>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

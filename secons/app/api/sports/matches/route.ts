@@ -73,6 +73,11 @@ export const POST = withAuth(async (req, { user }) => {
                 // Find the mongo user for animatorId
                 const dbUser = await User.findOne({ uid: user.uid });
 
+                // Sync event status with match status
+                let eventStatus: "published" | "ongoing" | "completed" = "published";
+                if (body.status === "live") eventStatus = "ongoing";
+                if (body.status === "completed") eventStatus = "completed";
+
                 // Create a default event for this sport
                 existingEvent = await Event.create({
                     title: body.sportName,
@@ -82,10 +87,20 @@ export const POST = withAuth(async (req, { user }) => {
                     startDateTime: new Date(body.scheduledAt),
                     endDateTime: new Date(new Date(body.scheduledAt).getTime() + 2 * 60 * 60 * 1000), // +2h
                     registrationLink: "N/A",
-                    status: "ongoing",
+                    status: eventStatus,
                     animatorId: dbUser?._id || user.uid,
                     jgaDomain: "sports"
                 });
+            } else {
+                // If event already exists, ensure its status is synced if this match is "more active"
+                let updatedStatus = existingEvent.status;
+                if (body.status === "live") updatedStatus = "ongoing";
+                else if (body.status === "completed" && existingEvent.status !== "ongoing") updatedStatus = "completed";
+                else if (body.status === "scheduled" && existingEvent.status === "draft") updatedStatus = "published";
+
+                if (updatedStatus !== existingEvent.status) {
+                    await Event.findByIdAndUpdate(existingEvent._id, { status: updatedStatus });
+                }
             }
             sportEventId = existingEvent._id;
         }

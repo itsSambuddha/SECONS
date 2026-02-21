@@ -3,12 +3,13 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { CalendarDays, MapPin, Clock, Search, Filter, ChevronLeft, ArrowLeft } from "lucide-react";
+import { CalendarDays, MapPin, Clock, Search, Filter, ChevronLeft, ArrowLeft, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
+import Footer from "@/components/layout/Footer";
 
 export default function AllEventsPage() {
     const [events, setEvents] = useState<any[]>([]);
@@ -31,13 +32,26 @@ export default function AllEventsPage() {
     }, []);
 
     useEffect(() => {
-        let filtered = events.filter(ev =>
-            ev.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            ev.category.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-        if (activeDomain !== "all") {
-            filtered = filtered.filter(ev => ev.jgaDomain === activeDomain);
-        }
+        let filtered = events.filter(ev => {
+            // General search match
+            const matchesSearch = ev.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                ev.category.toLowerCase().includes(searchQuery.toLowerCase());
+
+            if (!matchesSearch) return false;
+
+            // Sports Visibility Logic: 
+            // - If sports, must have a link OR be live (ongoing)
+            if (ev.jgaDomain === "sports") {
+                const hasLink = ev.registrationLink && ev.registrationLink !== "N/A" && ev.registrationLink.trim() !== "";
+                const isLive = ev.status === "ongoing";
+                if (!hasLink && !isLive) return false;
+            }
+
+            // Domain filter
+            if (activeDomain !== "all" && ev.jgaDomain !== activeDomain) return false;
+
+            return true;
+        });
         setFilteredEvents(filtered);
     }, [searchQuery, activeDomain, events]);
 
@@ -91,56 +105,97 @@ export default function AllEventsPage() {
                     </div>
                 ) : filteredEvents.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                        {filteredEvents.map((ev, i) => (
-                            <motion.div
-                                key={ev._id}
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: i * 0.05 }}
-                            >
-                                <Card className="h-full rounded-[2.5rem] border-slate-100 shadow-xl hover:shadow-2xl transition-all overflow-hidden group flex flex-col">
-                                    <div className="aspect-video relative overflow-hidden bg-slate-100 flex-shrink-0">
-                                        {ev.flierUrl ? (
-                                            <img src={ev.flierUrl} alt={ev.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                                        ) : (
-                                            <div className="flex items-center justify-center h-full text-slate-200"><CalendarDays className="size-20" /></div>
-                                        )}
-                                        <div className="absolute top-6 right-6 bg-white shadow-xl px-4 py-1.5 rounded-2xl text-[10px] font-black text-primary uppercase tracking-widest border border-slate-50">
-                                            {ev.jgaDomain}
-                                        </div>
-                                    </div>
-                                    <CardContent className="p-8 flex flex-col flex-grow">
-                                        <Badge variant="outline" className="w-fit mb-4 text-[10px] uppercase font-black border-primary/20 bg-primary/5 text-primary tracking-widest px-3">
-                                            {ev.category}
-                                        </Badge>
-                                        <h3 className="text-2xl font-display font-black text-slate-900 mb-4 uppercase italic tracking-tighter leading-none">{ev.title}</h3>
-                                        <p className="text-slate-500 text-sm mb-6 line-clamp-3 font-medium">{ev.description}</p>
+                        {filteredEvents.map((ev, i) => {
+                            const isSportsLive = ev.jgaDomain === "sports" && ev.status === "ongoing";
+                            const hasLink = ev.registrationLink && ev.registrationLink !== "N/A" && ev.registrationLink.trim() !== "";
 
-                                        <div className="mt-auto space-y-3">
-                                            <div className="flex items-center gap-3 text-slate-400 font-mono text-[10px] uppercase tracking-widest">
-                                                <MapPin className="size-3 text-primary" /> {ev.venue}
+                            return (
+                                <motion.div
+                                    key={ev._id}
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: i * 0.05 }}
+                                >
+                                    <Card className="h-full rounded-[2.5rem] border-slate-100 shadow-xl hover:shadow-2xl transition-all overflow-hidden group flex flex-col">
+                                        <div className="aspect-video relative overflow-hidden bg-slate-100 flex-shrink-0">
+                                            {ev.flierUrl ? (
+                                                <img src={ev.flierUrl} alt={ev.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                            ) : (
+                                                <div className="flex items-center justify-center h-full text-slate-200"><CalendarDays className="size-20" /></div>
+                                            )}
+                                            <div className="absolute top-6 right-6 bg-white shadow-xl px-4 py-1.5 rounded-2xl text-[10px] font-black text-primary uppercase tracking-widest border border-slate-50">
+                                                {ev.jgaDomain}
                                             </div>
-                                            <div className="flex items-center gap-3 text-slate-400 font-mono text-[10px] uppercase tracking-widest">
-                                                <Clock className="size-3 text-primary" /> {format(new Date(ev.startDateTime), "MMM d, h:mm a")}
-                                            </div>
+                                            {isSportsLive && (
+                                                <div className="absolute top-6 left-6 bg-red-500 shadow-xl px-4 py-1.5 rounded-2xl text-[10px] font-black text-white uppercase tracking-widest animate-pulse">
+                                                    Ongoing
+                                                </div>
+                                            )}
                                         </div>
+                                        <CardContent className="p-8 flex flex-col flex-grow">
+                                            <Badge variant="outline" className="w-fit mb-4 text-[10px] uppercase font-black border-primary/20 bg-primary/5 text-primary tracking-widest px-3">
+                                                {ev.category}
+                                            </Badge>
+                                            <h3 className="text-2xl font-display font-black text-slate-900 mb-4 uppercase italic tracking-tighter leading-none">{ev.title}</h3>
+                                            <p className="text-slate-500 text-sm mb-6 line-clamp-3 font-medium">{ev.description}</p>
 
-                                        {ev.registrationLink && (
-                                            <a href={ev.registrationLink} target="_blank" rel="noopener noreferrer" className="block mt-8">
-                                                <Button className="w-full h-12 rounded-2xl bg-slate-900 text-white hover:bg-primary font-black uppercase tracking-widest text-[11px] transition-all">
-                                                    Register Now
-                                                </Button>
-                                            </a>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            </motion.div>
-                        ))}
+                                            <div className="mt-auto space-y-3">
+                                                <div className="flex items-center gap-3 text-slate-400 font-mono text-[10px] uppercase tracking-widest">
+                                                    <MapPin className="size-3 text-primary" /> {ev.venue}
+                                                </div>
+                                                <div className="flex items-center gap-3 text-slate-400 font-mono text-[10px] uppercase tracking-widest">
+                                                    <Clock className="size-3 text-primary" /> {format(new Date(ev.startDateTime), "MMM d, h:mm a")}
+                                                </div>
+                                            </div>
+
+                                            <div className="block mt-8">
+                                                {ev.jgaDomain === "sports" ? (
+                                                    <>
+                                                        {ev.status === "ongoing" ? (
+                                                            <Link href="/live" className="block w-full">
+                                                                <Button className="w-full h-12 rounded-2xl bg-red-600 text-white hover:bg-red-700 font-black uppercase tracking-widest text-[11px] transition-all flex items-center justify-center gap-2">
+                                                                    <Activity className="size-4" /> See Live Scores
+                                                                </Button>
+                                                            </Link>
+                                                        ) : ev.status === "completed" ? (
+                                                            <Button disabled className="w-full h-12 rounded-2xl bg-slate-100 text-slate-400 font-black uppercase tracking-widest text-[11px] cursor-not-allowed">
+                                                                Completed
+                                                            </Button>
+                                                        ) : hasLink ? (
+                                                            <a href={ev.registrationLink} target="_blank" rel="noopener noreferrer" className="block w-full">
+                                                                <Button className="w-full h-12 rounded-2xl bg-slate-900 text-white hover:bg-primary font-black uppercase tracking-widest text-[11px] transition-all">
+                                                                    Register Now
+                                                                </Button>
+                                                            </a>
+                                                        ) : null}
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        {(ev.status === "ongoing" || ev.status === "completed") ? (
+                                                            <Button disabled className="w-full h-12 rounded-2xl bg-slate-100 text-slate-400 font-black uppercase tracking-widest text-[11px] cursor-not-allowed leading-tight px-4">
+                                                                Registration Closed / Event Completed
+                                                            </Button>
+                                                        ) : hasLink ? (
+                                                            <a href={ev.registrationLink} target="_blank" rel="noopener noreferrer" className="block w-full">
+                                                                <Button className="w-full h-12 rounded-2xl bg-slate-900 text-white hover:bg-primary font-black uppercase tracking-widest text-[11px] transition-all">
+                                                                    Register Now
+                                                                </Button>
+                                                            </a>
+                                                        ) : null}
+                                                    </>
+                                                )}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                </motion.div>
+                            );
+                        })}
                     </div>
                 ) : (
                     <div className="py-40 text-center opacity-20 font-display font-black text-4xl uppercase italic">No events found.</div>
                 )}
             </main>
+            <Footer />
         </div>
     );
 }

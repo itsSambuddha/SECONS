@@ -59,7 +59,6 @@ export const GET = withAuth(async (req, { user }) => {
                 finance: financeStats,
                 matches: recentMatches,
                 user: {
-                    name: user.name,
                     role: user.role,
                     domain: user.domain
                 }
