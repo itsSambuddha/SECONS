@@ -1,229 +1,146 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import {
-    CalendarDays, Search, MapPin, Clock, Tag, ExternalLink, Loader2, ArrowLeft
-} from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { format } from "date-fns";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { motion } from "framer-motion";
+import { CalendarDays, MapPin, Clock, Search, Filter, ChevronLeft, ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { format } from "date-fns";
 
-interface EventData {
-    _id: string;
-    title: string;
-    category: string;
-    description: string;
-    venue: string;
-    startDateTime: string;
-    endDateTime: string;
-    jgaDomain: string;
-    registrationLink: string;
-    flierUrl?: string;
-    status: string;
-}
-
-interface CategoryData {
-    _id: string;
-    name: string;
-    slug: string;
-}
-
-const DOMAINS = [
-    { value: "general", label: "General" },
-    { value: "sports", label: "Sports" },
-    { value: "cultural", label: "Cultural" },
-    { value: "literary", label: "Literary" },
-    { value: "security", label: "Security" },
-    { value: "stage_technical", label: "Stage & Technical" },
-    { value: "media", label: "Media" },
-    { value: "hospitality", label: "Hospitality" },
-    { value: "finance", label: "Finance" },
-];
-
-export default function PublicEventsPage() {
-    const [events, setEvents] = useState<EventData[]>([]);
-    const [categories, setCategories] = useState<CategoryData[]>([]);
+export default function AllEventsPage() {
+    const [events, setEvents] = useState<any[]>([]);
+    const [filteredEvents, setFilteredEvents] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    const [search, setSearch] = useState("");
-    const [categoryFilter, setCategoryFilter] = useState("all");
-    const [domainFilter, setDomainFilter] = useState("all");
-    const [dateSort, setDateSort] = useState("upcoming");
-
-    const fetchEvents = useCallback(async () => {
-        setLoading(true);
-        try {
-            const params = new URLSearchParams({ limit: "50" });
-            if (categoryFilter !== "all") params.set("category", categoryFilter);
-            if (domainFilter !== "all") params.set("domain", domainFilter);
-
-            const res = await fetch(`/api/events?${params}`);
-            const data = await res.json();
-            if (data.success) setEvents(data.data.events);
-        } catch {
-            // silently fail for public page
-        } finally {
-            setLoading(false);
-        }
-    }, [categoryFilter, domainFilter]);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [activeDomain, setActiveDomain] = useState("all");
 
     useEffect(() => {
-        fetch("/api/events/categories")
-            .then((r) => r.json())
-            .then((d) => { if (d.success) setCategories(d.data.categories); })
-            .catch(() => { });
+        fetch("/api/events?status=published&limit=50")
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) {
+                    setEvents(d.data.events);
+                    setFilteredEvents(d.data.events);
+                }
+            })
+            .catch(console.error)
+            .finally(() => setLoading(false));
     }, []);
 
-    useEffect(() => { fetchEvents(); }, [fetchEvents]);
+    useEffect(() => {
+        let filtered = events.filter(ev =>
+            ev.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            ev.category.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+        if (activeDomain !== "all") {
+            filtered = filtered.filter(ev => ev.jgaDomain === activeDomain);
+        }
+        setFilteredEvents(filtered);
+    }, [searchQuery, activeDomain, events]);
 
-    // Filter and sort
-    const filtered = events
-        .filter((e) => {
-            if (!search) return true;
-            const q = search.toLowerCase();
-            return e.title.toLowerCase().includes(q) || e.venue.toLowerCase().includes(q);
-        })
-        .sort((a, b) => {
-            const da = new Date(a.startDateTime).getTime();
-            const db = new Date(b.startDateTime).getTime();
-            return dateSort === "upcoming" ? da - db : db - da;
-        });
+    const domains = ["all", "sports", "cultural", "literary", "general"];
 
     return (
-        <div className="min-h-screen bg-background">
+        <div className="min-h-screen bg-[#F8F9FB] pb-20">
             {/* Header */}
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-8 pb-6">
-                <div className="mb-6">
-                    <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition-colors mb-4">
-                        <ArrowLeft className="size-4" /> Back to Home
+            <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-200">
+                <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+                    <Link href="/" className="flex items-center gap-2 text-slate-900 hover:text-primary transition-colors">
+                        <ArrowLeft className="size-5" />
+                        <span className="font-display font-black uppercase text-sm tracking-tighter">Back to Home</span>
                     </Link>
-                    <h1 className="text-3xl sm:text-4xl font-display font-bold text-foreground">All Events</h1>
-                    <p className="text-muted-foreground mt-1">Discover all the exciting events at our festival</p>
+                    <div className="font-display font-black uppercase italic text-lg tracking-tighter">Event Directory</div>
                 </div>
+            </header>
 
-                {/* Filters */}
-                <div className="flex flex-col sm:flex-row gap-3 mb-8">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+            <main className="max-w-7xl mx-auto px-6 pt-12">
+                {/* Search & Filters */}
+                <div className="mb-12 space-y-6">
+                    <div className="relative max-w-2xl">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-slate-400" />
                         <Input
-                            placeholder="Search events..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            className="pl-10 glass-heavy"
+                            placeholder="Search events, categories..."
+                            className="h-14 pl-12 rounded-2xl border-slate-200 shadow-sm text-lg"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
                         />
                     </div>
-                    <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                        <SelectTrigger className="w-full sm:w-44 glass-heavy"><SelectValue placeholder="Category" /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Categories</SelectItem>
-                            {categories.map((c) => <SelectItem key={c.slug} value={c.slug}>{c.name}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                    <Select value={domainFilter} onValueChange={setDomainFilter}>
-                        <SelectTrigger className="w-full sm:w-36 glass-heavy"><SelectValue placeholder="Domain" /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Domains</SelectItem>
-                            {DOMAINS.map((d) => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                    <Select value={dateSort} onValueChange={setDateSort}>
-                        <SelectTrigger className="w-full sm:w-40 glass-heavy"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="upcoming">Upcoming First</SelectItem>
-                            <SelectItem value="latest">Latest First</SelectItem>
-                        </SelectContent>
-                    </Select>
+
+                    <div className="flex flex-wrap gap-2">
+                        {domains.map(d => (
+                            <Button
+                                key={d}
+                                variant={activeDomain === d ? "default" : "outline"}
+                                onClick={() => setActiveDomain(d)}
+                                className="rounded-full uppercase text-[10px] font-black tracking-widest px-6 h-9"
+                            >
+                                {d}
+                            </Button>
+                        ))}
+                    </div>
                 </div>
 
-                {/* Events Grid */}
                 {loading ? (
-                    <div className="flex items-center justify-center py-20 text-muted-foreground">
-                        <Loader2 className="size-6 animate-spin mr-3" /> Loading events...
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        {[1, 2, 3].map(i => (
+                            <div key={i} className="h-[400px] rounded-[2.5rem] bg-slate-200 animate-pulse" />
+                        ))}
                     </div>
-                ) : filtered.length === 0 ? (
-                    <Card className="glass-heavy border-dashed border-primary/20">
-                        <CardContent className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-                            <CalendarDays className="size-16 mb-4 opacity-30" />
-                            <p className="text-xl font-display font-semibold mb-1">No Events Found</p>
-                            <p className="text-sm">Check back soon for upcoming events!</p>
-                        </CardContent>
-                    </Card>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {filtered.map((event) => {
-                            const catName = categories.find((c) => c.slug === event.category)?.name || event.category;
-                            return (
-                                <Card key={event._id} className="glass-heavy border-primary/10 hover:shadow-glow transition-all group overflow-hidden flex flex-col">
-                                    {/* Flyer */}
-                                    {event.flierUrl ? (
-                                        <div className="w-full h-48 overflow-hidden bg-muted">
-                                            <img
-                                                src={event.flierUrl}
-                                                alt={event.title}
-                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                            />
+                ) : filteredEvents.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        {filteredEvents.map((ev, i) => (
+                            <motion.div
+                                key={ev._id}
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: i * 0.05 }}
+                            >
+                                <Card className="h-full rounded-[2.5rem] border-slate-100 shadow-xl hover:shadow-2xl transition-all overflow-hidden group flex flex-col">
+                                    <div className="aspect-video relative overflow-hidden bg-slate-100 flex-shrink-0">
+                                        {ev.flierUrl ? (
+                                            <img src={ev.flierUrl} alt={ev.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                        ) : (
+                                            <div className="flex items-center justify-center h-full text-slate-200"><CalendarDays className="size-20" /></div>
+                                        )}
+                                        <div className="absolute top-6 right-6 bg-white shadow-xl px-4 py-1.5 rounded-2xl text-[10px] font-black text-primary uppercase tracking-widest border border-slate-50">
+                                            {ev.jgaDomain}
                                         </div>
-                                    ) : (
-                                        <div className="w-full h-32 bg-gradient-to-br from-primary/5 to-accent/5 flex items-center justify-center">
-                                            <CalendarDays className="size-12 text-primary/20" />
-                                        </div>
-                                    )}
-
-                                    <CardContent className="py-5 space-y-3 flex-1 flex flex-col">
-                                        <h3 className="font-display font-bold text-foreground text-lg leading-tight line-clamp-2">
-                                            {event.title}
-                                        </h3>
-
-                                        {/* Domain Pill */}
-                                        <Badge className="self-start bg-primary/10 text-primary border-primary/20 text-xs px-2.5 py-0.5 rounded-full capitalize">
-                                            {event.jgaDomain.replace(/_/g, " ")}
+                                    </div>
+                                    <CardContent className="p-8 flex flex-col flex-grow">
+                                        <Badge variant="outline" className="w-fit mb-4 text-[10px] uppercase font-black border-primary/20 bg-primary/5 text-primary tracking-widest px-3">
+                                            {ev.category}
                                         </Badge>
+                                        <h3 className="text-2xl font-display font-black text-slate-900 mb-4 uppercase italic tracking-tighter leading-none">{ev.title}</h3>
+                                        <p className="text-slate-500 text-sm mb-6 line-clamp-3 font-medium">{ev.description}</p>
 
-                                        {/* Details */}
-                                        <div className="space-y-2 text-sm text-muted-foreground flex-1">
-                                            <div className="flex items-center gap-2">
-                                                <Clock className="size-3.5 shrink-0" />
-                                                <span>
-                                                    {format(new Date(event.startDateTime), "MMM d, yyyy · h:mm a")}
-                                                    {" → "}
-                                                    {format(new Date(event.endDateTime), "h:mm a")}
-                                                </span>
+                                        <div className="mt-auto space-y-3">
+                                            <div className="flex items-center gap-3 text-slate-400 font-mono text-[10px] uppercase tracking-widest">
+                                                <MapPin className="size-3 text-primary" /> {ev.venue}
                                             </div>
-                                            <div className="flex items-center gap-2">
-                                                <MapPin className="size-3.5 shrink-0" />
-                                                <span>{event.venue}</span>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <Tag className="size-3.5 shrink-0" />
-                                                <span className="capitalize">{catName.replace(/_/g, " ")}</span>
+                                            <div className="flex items-center gap-3 text-slate-400 font-mono text-[10px] uppercase tracking-widest">
+                                                <Clock className="size-3 text-primary" /> {format(new Date(ev.startDateTime), "MMM d, h:mm a")}
                                             </div>
                                         </div>
 
-                                        {/* Register */}
-                                        {event.registrationLink && (
-                                            <a href={event.registrationLink} target="_blank" rel="noopener noreferrer">
-                                                <Button className="w-full gap-2 bg-gradient-to-r from-primary to-primary-600 text-white text-sm h-9">
-                                                    <ExternalLink className="size-4" /> Register Now
+                                        {ev.registrationLink && (
+                                            <a href={ev.registrationLink} target="_blank" rel="noopener noreferrer" className="block mt-8">
+                                                <Button className="w-full h-12 rounded-2xl bg-slate-900 text-white hover:bg-primary font-black uppercase tracking-widest text-[11px] transition-all">
+                                                    Register Now
                                                 </Button>
                                             </a>
                                         )}
                                     </CardContent>
                                 </Card>
-                            );
-                        })}
+                            </motion.div>
+                        ))}
                     </div>
+                ) : (
+                    <div className="py-40 text-center opacity-20 font-display font-black text-4xl uppercase italic">No events found.</div>
                 )}
-
-                {/* Summary */}
-                {!loading && filtered.length > 0 && (
-                    <p className="text-center text-sm text-muted-foreground mt-8 pb-10">
-                        Showing {filtered.length} event{filtered.length !== 1 ? "s" : ""}
-                    </p>
-                )}
-            </div>
+            </main>
         </div>
     );
 }

@@ -13,7 +13,8 @@ import {
     Users,
     Settings,
     FileText,
-    Video
+    Video,
+    Wind
 } from "lucide-react";
 
 export interface NavItem {
@@ -107,9 +108,9 @@ export const secondaryNav: NavItem[] = [
         icon: Users,
     },
     {
-        label: "Documents",
-        href: "/documents",
-        icon: FileText,
+        label: "Take a Breath",
+        href: "/breath",
+        icon: Wind,
     },
     {
         label: "Settings",

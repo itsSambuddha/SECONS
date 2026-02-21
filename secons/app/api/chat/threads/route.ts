@@ -173,6 +173,28 @@ export async function POST(req: NextRequest) {
             participants.push(decoded.uid);
         }
 
+        // Duplication Check: If a thread of same type and identical participants exists, return it
+        const participantsHash = [...participants].sort();
+        const existingThread = await ChatThread.findOne({
+            type,
+            participants: { $size: participants.length, $all: participants },
+            // For event/domain specific threads, also check the ID/domain
+            ...(domain ? { domain } : {}),
+            ...(eventId ? { eventId } : {}),
+        }).lean();
+
+        if (existingThread) {
+            return NextResponse.json({
+                success: true,
+                data: {
+                    _id: String(existingThread._id),
+                    name: existingThread.name,
+                    type: existingThread.type,
+                    participants: existingThread.participants
+                }
+            });
+        }
+
         const thread = await ChatThread.create({
             type,
             name,

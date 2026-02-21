@@ -31,7 +31,7 @@ export function Sidebar({ className, collapsed }: SidebarProps) {
                     </div>
                     {!collapsed && (
                         <div className="flex flex-col animate-fade-in-up">
-                            <span className="font-display font-bold text-lg tracking-tight text-primary dark:text-white leading-none">SECONS</span>
+                            <span className="font-display font-bold text-lg tracking-tight text-primary dark:text-black leading-none">SECONS</span>
                             <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mt-0.5">EdBlazon Platform</span>
                         </div>
                     )}

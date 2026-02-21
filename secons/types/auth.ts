@@ -22,6 +22,8 @@ export interface SessionUser {
     role: UserRole;
     domain: UserDomain;
     photoURL?: string;
+    phoneNumber?: string;
+    whatsappNumber?: string;
     isActive: boolean;
     onboardingComplete: boolean;
     tourComplete: boolean;
