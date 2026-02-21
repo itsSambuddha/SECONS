@@ -5,12 +5,14 @@ import Link from "next/link";
 import { motion, useScroll, useTransform, useInView } from "framer-motion";
 import {
   CalendarDays, Trophy, Users, Zap, Shield, BarChart3, MessageCircle, Map as MapIcon,
-  ArrowRight, ChevronDown, Menu, X, Check, Star, Play
+  ArrowRight, ChevronDown, Menu, X, Check, Star, Play, Activity, ExternalLink
 } from "lucide-react";
+import { useRole } from "@/hooks/useRole";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 
 /* ============================
    CONSTANTS & DATA
@@ -161,6 +163,8 @@ function Navbar() {
 }
 
 function Hero() {
+  const { user } = useAuth();
+  const { isManager } = useRole();
   const { scrollY } = useScroll();
   const y1 = useTransform(scrollY, [0, 500], [0, 100]);
   const opacity = useTransform(scrollY, [0, 300], [1, 0]);
@@ -212,14 +216,21 @@ function Hero() {
         >
           <Link href="/login">
             <Button size="lg" className="h-14 px-8 rounded-full bg-primary text-white hover:bg-primary-700 font-bold text-base shadow-lg shadow-primary/20 transition-all hover:scale-105">
-              Get Started <ArrowRight className="ml-2 size-5" />
+              {user ? "Go to Console" : "Get Started"} <ArrowRight className="ml-2 size-5" />
             </Button>
           </Link>
-          <Link href="#features">
-            <Button size="lg" variant="outline" className="h-14 px-8 rounded-full border-slate-200 hover:bg-white hover:text-primary bg-white/50 backdrop-blur-sm text-slate-600">
-              Explore Features
+          <Link href="/live">
+            <Button size="lg" variant="outline" className="h-14 px-8 rounded-full border-primary/20 hover:bg-primary/5 text-primary font-bold shadow-sm flex items-center gap-2">
+              <Activity className="size-5" /> Live Scoreboard
             </Button>
           </Link>
+          {isManager && (
+            <Link href="/sports">
+              <Button size="lg" variant="outline" className="h-14 px-8 rounded-full border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 font-bold shadow-sm flex items-center gap-2">
+                <Trophy className="size-5" /> Sports Command
+              </Button>
+            </Link>
+          )}
         </motion.div>
       </div>
 

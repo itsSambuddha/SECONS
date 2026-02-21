@@ -14,7 +14,7 @@ interface AuthContextType {
     signIn: (email: string, password: string) => Promise<void>;
     signOut: () => Promise<void>;
     refreshUser: () => Promise<void>;
-    getToken: () => Promise<string | null>;
+    getToken: (forceRefresh?: boolean) => Promise<string | null>;
 }
 
 export const AuthContext = createContext<AuthContextType>({
@@ -109,10 +109,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    const getToken = async () => {
+    const getToken = async (forceRefresh: boolean = false) => {
         const auth = getAuthInstance();
-        // Force refresh to pick up latest custom claims (role, domain)
-        return await getIdToken(auth.currentUser, true);
+        if (!auth.currentUser) return null;
+        return await getIdToken(auth.currentUser, forceRefresh);
     };
 
     return (

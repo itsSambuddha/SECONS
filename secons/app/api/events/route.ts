@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import Event from "@/models/Event";
+import Notification from "@/models/Notification";
 import { verifyAndDecodeToken } from "@/lib/firebase-admin";
 import type { ApiResponse } from "@/types/api";
 import type { UserRole } from "@/types/auth";
@@ -138,6 +139,21 @@ export async function POST(req: NextRequest) {
             status: eventStatus || "draft",
             animatorId: creator._id,
         });
+
+        // If the event is published, notify all active users
+        if (event.status === "published") {
+            const allUsers = await User.find({ uid: { $ne: decoded.uid }, isActive: true }).select("uid").lean();
+            if (allUsers.length > 0) {
+                const notifications = allUsers.map(u => ({
+                    userId: u.uid,
+                    type: "system",
+                    title: `New Event: ${event.title}`,
+                    body: `A new ${event.category} event has been published!`,
+                    link: `/all-events`,
+                }));
+                await Notification.insertMany(notifications).catch(err => console.error("Failed to insert event notifications", err));
+            }
+        }
 
         return NextResponse.json<ApiResponse<{ event: unknown }>>({
             success: true,

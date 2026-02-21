@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Bell, Menu, X, ChevronRight, User } from "lucide-react";
+import { Menu, X, ChevronRight, User } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { NotificationBell } from "./NotificationBell";
 
 interface TopBarProps {
     className?: string;
@@ -70,11 +71,8 @@ export function TopBar({ className, onMenuClick, showMenuButton }: TopBarProps) 
             </div>
 
             <div className="flex items-center gap-3">
-                {/* Notifications (Placeholder) */}
-                <button className="relative p-2 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground transition-colors group">
-                    <Bell className="size-5 group-hover:scale-110 transition-transform" />
-                    <span className="absolute top-2 right-2 size-2 bg-accent rounded-full border-2 border-surface" />
-                </button>
+                {/* Notification Bell Dropdown */}
+                <NotificationBell />
 
                 {/* User Profile */}
                 <Link href="/settings" className="flex items-center gap-3 pl-2 border-l border-border/50">

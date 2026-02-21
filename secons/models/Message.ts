@@ -11,13 +11,22 @@ export interface IMessageAttachment {
     size: number;
 }
 
+export interface IReaction {
+    emoji: string;
+    userIds: string[];
+}
+
 export interface IMessage extends Document {
     threadId: mongoose.Types.ObjectId;
     senderId: string;
     content: string;
     attachments: IMessageAttachment[];
+    replyTo?: mongoose.Types.ObjectId;
     readBy: string[];
     pinned: boolean;
+    edited: boolean;
+    deletedAt?: Date;
+    reactions: IReaction[];
     sentAt: Date;
 }
 
@@ -31,14 +40,26 @@ const attachmentSchema = new Schema<IMessageAttachment>(
     { _id: false }
 );
 
+const reactionSchema = new Schema<IReaction>(
+    {
+        emoji: { type: String, required: true },
+        userIds: { type: [String], default: [] },
+    },
+    { _id: false }
+);
+
 const messageSchema = new Schema<IMessage>(
     {
         threadId: { type: Schema.Types.ObjectId, ref: "ChatThread", required: true, index: true },
         senderId: { type: String, required: true, index: true },
         content: { type: String, required: true },
         attachments: { type: [attachmentSchema], default: [] },
+        replyTo: { type: Schema.Types.ObjectId, ref: "Message" },
         readBy: { type: [String], default: [] },
         pinned: { type: Boolean, default: false },
+        edited: { type: Boolean, default: false },
+        deletedAt: { type: Date },
+        reactions: { type: [reactionSchema], default: [] },
         sentAt: { type: Date, default: Date.now, index: true },
     },
     {

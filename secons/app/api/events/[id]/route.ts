@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import Event from "@/models/Event";
+import User from "@/models/User";
+import Notification from "@/models/Notification";
 import { verifyAndDecodeToken } from "@/lib/firebase-admin";
 import { deleteImage } from "@/lib/cloudinary";
 import type { ApiResponse } from "@/types/api";
@@ -140,6 +142,21 @@ export async function PATCH(
         }
 
         const updated = await Event.findByIdAndUpdate(id, updates, { new: true }).lean();
+
+        // If the status just changed to "published", notify users
+        if (body.status === "published" && existing.status !== "published") {
+            const allUsers = await User.find({ uid: { $ne: decoded.uid }, isActive: true }).select("uid").lean();
+            if (allUsers.length > 0) {
+                const notifications = allUsers.map(u => ({
+                    userId: u.uid,
+                    type: "system",
+                    title: `Event Published: ${updated?.title || "New Event"}`,
+                    body: `The ${updated?.category || ""} event is now open or live!`,
+                    link: `/all-events`,
+                }));
+                await Notification.insertMany(notifications).catch(err => console.error("Failed to insert event notifications on patch", err));
+            }
+        }
 
         return NextResponse.json<ApiResponse<{ event: unknown }>>({
             success: true,

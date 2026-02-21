@@ -7,10 +7,13 @@ import mongoose, { Schema, type Document } from "mongoose";
 export interface IChatThread extends Document {
     type: "workspace" | "domain" | "event" | "volunteer" | "custom";
     name: string;
+    description?: string;
+    avatar?: string;
     participants: string[];
     eventId?: mongoose.Types.ObjectId;
     domain?: string;
     createdBy: string;
+    isArchived: boolean;
     lastMessageAt?: Date;
     createdAt: Date;
 }
@@ -24,10 +27,13 @@ const chatThreadSchema = new Schema<IChatThread>(
             index: true,
         },
         name: { type: String, required: true, trim: true },
+        description: { type: String, trim: true },
+        avatar: { type: String },
         participants: { type: [String], required: true, index: true },
         eventId: { type: Schema.Types.ObjectId, ref: "Event" },
         domain: { type: String },
         createdBy: { type: String, required: true },
+        isArchived: { type: Boolean, default: false },
         lastMessageAt: { type: Date },
     },
     {
