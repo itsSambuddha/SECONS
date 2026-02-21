@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import Match from "@/models/Match";
 import Team from "@/models/Team";
+import User from "@/models/User";
+import Event from "@/models/Event";
 import { withAuth } from "@/lib/withAuth";
 import { ApiResponse } from "@/types/api";
 
@@ -58,8 +60,43 @@ export const POST = withAuth(async (req, { user }) => {
             return NextResponse.json({ success: false, error: "Missing required fields" }, { status: 400 });
         }
 
+        // Create or Link to Event automatically
+        let sportEventId = body.sportEventId;
+        if (!sportEventId) {
+            // Find an event with the sport name as title
+            let existingEvent = await Event.findOne({
+                title: body.sportName,
+                category: "Sports"
+            });
+
+            if (!existingEvent) {
+                // Find the mongo user for animatorId
+                const dbUser = await User.findOne({ uid: user.uid });
+
+                // Create a default event for this sport
+                existingEvent = await Event.create({
+                    title: body.sportName,
+                    category: "Sports",
+                    description: `Automated scoring container for ${body.sportName} circuits.`,
+                    venue: body.venue || "Main Grounds",
+                    startDateTime: new Date(body.scheduledAt),
+                    endDateTime: new Date(new Date(body.scheduledAt).getTime() + 2 * 60 * 60 * 1000), // +2h
+                    registrationLink: "N/A",
+                    status: "ongoing",
+                    animatorId: dbUser?._id || user.uid,
+                    jgaDomain: "sports"
+                });
+            }
+            sportEventId = existingEvent._id;
+        }
+
+        // Sanitize IDs: convert empty strings to undefined
+        const sanitizedData = { ...body, sportEventId };
+        if (sanitizedData.fixtureId === "") delete sanitizedData.fixtureId;
+        if (sanitizedData.winner === "" || sanitizedData.winner === "draw") sanitizedData.winner = null;
+
         const match = await Match.create({
-            ...body,
+            ...sanitizedData,
             auditTrail: [{
                 enteredBy: user.uid,
                 scoreTeam1: body.scoreTeam1 || 0,

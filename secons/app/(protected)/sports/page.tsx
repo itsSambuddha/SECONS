@@ -49,6 +49,7 @@ interface MatchData {
     roundName?: string;
     format: string;
     cricketData?: any;
+    sportEventId?: string;
 }
 
 interface TeamData {
@@ -376,17 +377,6 @@ function MatchCard({ match, teams, onUpdate, onDelete }: { match: MatchData, tea
                     {status.label}
                 </Badge>
                 <div className="flex items-center gap-1">
-                    {/* Status Transitions (Only for Live/Scheduled) */}
-                    {(match.status === "live" || match.status === "scheduled") && (
-                        <div className="flex items-center gap-1 mr-2 border-r border-border pr-2">
-                            <Button variant="ghost" size="icon" className="size-8 rounded-full text-green-600 hover:bg-green-50" onClick={() => updateStatus("completed")} title="Mark Completed">
-                                <Check className="size-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="size-8 rounded-full text-red-500 hover:bg-gray-50" onClick={() => updateStatus("cancelled")} title="Cancel Match">
-                                <X className="size-4" />
-                            </Button>
-                        </div>
-                    )}
                     <UpdateScoreDialog match={match} onComplete={onUpdate} />
                     <CreateMatchDialog
                         teams={teams}
@@ -460,8 +450,12 @@ function CreateMatchDialog({ teams, onComplete, fetchTeams, runSeeding, mode = "
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
 
+
+
     useEffect(() => {
-        if (open) fetchTeams();
+        if (open) {
+            fetchTeams();
+        }
     }, [open, fetchTeams]);
 
     const initialForm = {
@@ -566,11 +560,13 @@ function CreateMatchDialog({ teams, onComplete, fetchTeams, runSeeding, mode = "
                             </Select>
                         </div>
                     </div>
+
+
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">Blue Node (Team 1)</Label>
                             <Select value={form.team1Id} onValueChange={v => setForm({ ...form, team1Id: v })}>
-                                <SelectTrigger className="glass-heavy w-full"><SelectValue placeholder="Select team" /></SelectTrigger>
+                                <SelectTrigger className="glass-heavy w-full h-10"><SelectValue placeholder="Select team" /></SelectTrigger>
                                 <SelectContent position="popper" className="z-[100]">
                                     {teams.length === 0 ? (
                                         <SelectItem value="none" disabled className="text-[10px] font-mono uppercase">
@@ -589,7 +585,7 @@ function CreateMatchDialog({ teams, onComplete, fetchTeams, runSeeding, mode = "
                         <div className="space-y-2">
                             <Label className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">Red Node (Team 2)</Label>
                             <Select value={form.team2Id} onValueChange={v => setForm({ ...form, team2Id: v })}>
-                                <SelectTrigger className="glass-heavy w-full"><SelectValue placeholder="Select team" /></SelectTrigger>
+                                <SelectTrigger className="glass-heavy w-full h-10"><SelectValue placeholder="Select team" /></SelectTrigger>
                                 <SelectContent position="popper" className="z-[100]">
                                     {teams.length === 0 ? (
                                         <SelectItem value="none" disabled className="text-[10px] font-mono uppercase">
@@ -641,6 +637,7 @@ function UpdateScoreDialog({ match, onComplete }: { match: MatchData, onComplete
         scoreTeam1: match.scoreTeam1,
         scoreTeam2: match.scoreTeam2,
         status: match.status,
+        winner: "",
         note: ""
     });
 
@@ -671,28 +668,14 @@ function UpdateScoreDialog({ match, onComplete }: { match: MatchData, onComplete
         }
     };
 
-    const handleStatusOverride = async (newStatus: string) => {
-        setLoading(true);
-        try {
-            const token = await getToken();
-            const res = await fetch(`/api/sports/matches/${match._id}`, {
-                method: "PATCH",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify({ status: newStatus }),
-            });
-            const data = await res.json();
-            if (data.success) {
-                toast.success(`Broadcasting Terminal: Match ${newStatus}`);
-                setOpen(false);
-                onComplete();
-            }
-        } catch (e) {
-            toast.error("Override failed");
-        } finally {
-            setLoading(false);
+    const handleStatusOverride = (newStatus: string) => {
+        if (newStatus === "completed") {
+            const winner = scores.scoreTeam1 > scores.scoreTeam2 ? match.team1Id._id :
+                scores.scoreTeam1 < scores.scoreTeam2 ? match.team2Id._id : "draw";
+            setScores(prev => ({ ...prev, status: "completed" as any, winner }));
+            toast.success("Select winner to finalize match.");
+        } else {
+            setScores({ ...scores, status: newStatus as any });
         }
     };
 
@@ -708,14 +691,14 @@ function UpdateScoreDialog({ match, onComplete }: { match: MatchData, onComplete
                     <div className="flex justify-between items-start w-full">
                         <div className="space-y-1">
                             <DialogTitle className="text-xl font-display font-black tracking-tight uppercase text-primary">
-                                {(isCricket && match.status === "live") ? "Cricket Scorer Node" : "Precision Update"}
+                                {(isCricket && (match.status === "live" || match.status === "scheduled")) ? "Cricket Scorer Node" : "Precision Update"}
                             </DialogTitle>
                             <DialogDescription className="text-[10px] leading-tight max-w-[200px]">
-                                {(isCricket && match.status === "live") ? "Tactical ball-by-ball telemetry sync for 8-over circuit." : "Manually override scoring values for this circuit."}
+                                {(isCricket && (match.status === "live" || match.status === "scheduled")) ? "Tactical ball-by-ball telemetry sync for 8-over circuit." : "Manually override scoring values for this circuit."}
                             </DialogDescription>
                         </div>
 
-                        {match.status === "live" && (
+                        {(match.status === "live" || match.status === "scheduled") && (
                             <div className="flex flex-col items-end gap-2 shrink-0">
                                 <Select onValueChange={handleStatusOverride}>
                                     <SelectTrigger className="w-[140px] h-9 rounded-xl bg-slate-900 text-white border-0 shadow-xl text-[9px] font-black tracking-widest uppercase focus:ring-0">
@@ -732,7 +715,7 @@ function UpdateScoreDialog({ match, onComplete }: { match: MatchData, onComplete
                     </div>
                 </DialogHeader>
 
-                {(isCricket && match.status === "live") ? (
+                {(isCricket && (match.status === "live" || match.status === "scheduled") && scores.status !== "completed") ? (
                     <CricketScorer match={match} onComplete={onComplete} setOpen={setOpen} />
                 ) : (
                     <>
@@ -740,16 +723,28 @@ function UpdateScoreDialog({ match, onComplete }: { match: MatchData, onComplete
                             <div className="flex items-center justify-between gap-6">
                                 <div className="flex-1 space-y-2">
                                     <Label className="text-[10px] font-mono text-muted-foreground uppercase text-center block w-full">{match.team1Id.name}</Label>
-                                    <Input type="number" value={scores.scoreTeam1} onChange={e => setScores({ ...scores, scoreTeam1: parseInt(e.target.value) })} className="text-center text-3xl font-display font-black h-20 rounded-2xl glass-heavy" />
+                                    <Input
+                                        type="number"
+                                        value={scores.scoreTeam1}
+                                        onChange={e => setScores({ ...scores, scoreTeam1: parseInt(e.target.value) })}
+                                        className="text-center text-3xl font-display font-black h-20 rounded-2xl glass-heavy"
+                                        disabled={match.status === "completed"}
+                                    />
                                 </div>
                                 <div className="text-xl font-black text-slate-200">VS</div>
                                 <div className="flex-1 space-y-2">
                                     <Label className="text-[10px] font-mono text-muted-foreground uppercase text-center block w-full">{match.team2Id.name}</Label>
-                                    <Input type="number" value={scores.scoreTeam2} onChange={e => setScores({ ...scores, scoreTeam2: parseInt(e.target.value) })} className="text-center text-3xl font-display font-black h-20 rounded-2xl glass-heavy" />
+                                    <Input
+                                        type="number"
+                                        value={scores.scoreTeam2}
+                                        onChange={e => setScores({ ...scores, scoreTeam2: parseInt(e.target.value) })}
+                                        className="text-center text-3xl font-display font-black h-20 rounded-2xl glass-heavy"
+                                        disabled={match.status === "completed"}
+                                    />
                                 </div>
                             </div>
 
-                            {match.status !== "live" && (
+                            {(match.status === "live" || match.status === "scheduled" || scores.status === "completed") && (
                                 <div className="space-y-2">
                                     <Label className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">Circuit Status</Label>
                                     <Select value={scores.status} onValueChange={(v: any) => setScores({ ...scores, status: v })}>
@@ -758,6 +753,23 @@ function UpdateScoreDialog({ match, onComplete }: { match: MatchData, onComplete
                                             {MATCH_STATUSES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
                                         </SelectContent>
                                     </Select>
+                                </div>
+                            )}
+
+                            {scores.status === "completed" && (
+                                <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                                    <Label className="text-[10px] font-mono text-primary uppercase tracking-[0.2em] font-black">Who Won? *</Label>
+                                    <Select value={scores.winner} onValueChange={v => setScores({ ...scores, winner: v })}>
+                                        <SelectTrigger className="glass-heavy border-primary/30 h-12 text-sm font-bold">
+                                            <SelectValue placeholder="Select Winner or Draw" />
+                                        </SelectTrigger>
+                                        <SelectContent className="z-[110]">
+                                            <SelectItem value={match.team1Id._id} className="font-bold">{match.team1Id.name} Won</SelectItem>
+                                            <SelectItem value={match.team2Id._id} className="font-bold">{match.team2Id.name} Won</SelectItem>
+                                            <SelectItem value="draw" className="text-slate-500 italic">Match Draw / Tie</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <p className="text-[8px] text-muted-foreground uppercase font-bold tracking-tight px-1">Winning team receives 1 point. Draw awards 0 points to each.</p>
                                 </div>
                             )}
 
@@ -817,7 +829,7 @@ function CricketScorer({ match, onComplete, setOpen }: { match: MatchData, onCom
     const currentTeamStats = isFirstInnings ? data.team1 : data.team2;
 
     const handleAction = (type: string, value: number = 0) => {
-        if (activePrompt) return; // Block while prompting
+        if (activePrompt || match.status === "completed") return; // Block while prompting or completed
 
         const newData = JSON.parse(JSON.stringify(data));
         const stats = newData.innings === 1 ? newData.team1 : newData.team2;
@@ -869,7 +881,13 @@ function CricketScorer({ match, onComplete, setOpen }: { match: MatchData, onCom
             newData.batting.nonStriker = temp;
 
             // Trigger Bowler Prompt if match not finished
-            const matchFinished = (newData.innings === 2 && (newData.team2.overs >= 8 || newData.team2.runs >= newData.target));
+            const matchFinished = (
+                data.innings === 2 && (
+                    newData.team2.overs >= 8 ||
+                    newData.team2.wickets >= 10 ||
+                    (newData.target && newData.team2.runs >= newData.target)
+                )
+            );
             if (!matchFinished) {
                 setData(newData);
                 setActivePrompt({ type: "bowler", names: { bowler: "" } });
@@ -877,8 +895,8 @@ function CricketScorer({ match, onComplete, setOpen }: { match: MatchData, onCom
             }
         }
 
-        // Innings Transition (8 Overs)
-        if (stats.overs >= 8 && newData.innings === 1) {
+        // Innings Transition (8 Overs OR 10 Wickets)
+        if ((stats.overs >= 8 || stats.wickets >= 10) && newData.innings === 1) {
             newData.innings = 2;
             newData.target = stats.runs + 1;
             newData.thisOver = [];
@@ -928,9 +946,31 @@ function CricketScorer({ match, onComplete, setOpen }: { match: MatchData, onCom
     };
 
     const handleSync = async () => {
+        if (match.status === "completed") return;
         setLoading(true);
         try {
             const token = await getToken();
+            const isMatchOver = (
+                data.innings === 2 && (
+                    data.team2.overs >= 8 ||
+                    data.team2.wickets >= 10 ||
+                    (data.target && data.team2.runs >= data.target)
+                )
+            );
+
+            const status = isMatchOver ? "completed" : "live";
+            let winner = null;
+
+            if (status === "completed") {
+                if (data.target && data.team2.runs >= data.target) {
+                    winner = match.team2Id._id;
+                } else if (data.target && (data.team2.overs >= 8 || data.team2.wickets >= 10)) {
+                    winner = match.team1Id._id;
+                } else if (data.target && data.team2.runs === data.target - 1) {
+                    winner = "draw";
+                }
+            }
+
             const res = await fetch(`/api/sports/matches/${match._id}`, {
                 method: "PATCH",
                 headers: {
@@ -941,7 +981,8 @@ function CricketScorer({ match, onComplete, setOpen }: { match: MatchData, onCom
                     cricketData: data,
                     scoreTeam1: data.team1.runs,
                     scoreTeam2: data.team2.runs,
-                    status: (data.innings === 2 && (data.team2.overs >= 8 || (data.target && data.team2.runs >= data.target))) ? "completed" : "live"
+                    status,
+                    winner
                 }),
             });
             const resData = await res.json();
@@ -1028,12 +1069,21 @@ function CricketScorer({ match, onComplete, setOpen }: { match: MatchData, onCom
 
             {/* iOS Action Dashboard */}
             <div className="space-y-6 relative">
+                {match.status === "completed" && (
+                    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-white/40 backdrop-blur-md rounded-[2rem]">
+                        <div className="text-center p-8 bg-white/90 glass-heavy border-primary/20 rounded-[2.5rem] shadow-2xl scale-110">
+                            <Trophy className="size-16 text-primary mx-auto mb-4 animate-bounce-slow" />
+                            <h3 className="text-2xl font-display font-black text-slate-900 uppercase tracking-tighter">Terminal Locked</h3>
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Sync node finalized and signed.</p>
+                        </div>
+                    </div>
+                )}
                 <div className="grid grid-cols-4 gap-3">
                     {[0, 1, 2, 3, 4, 6].map(r => (
                         <button
                             key={r}
                             onClick={() => handleAction("run", r)}
-                            disabled={!!activePrompt}
+                            disabled={!!activePrompt || match.status === "completed"}
                             className="h-16 rounded-[1.5rem] bg-white border border-slate-100 shadow-sm text-xl font-black text-slate-900 hover:bg-slate-50 active:scale-90 transition-all disabled:opacity-50"
                         >
                             {r}
@@ -1041,14 +1091,14 @@ function CricketScorer({ match, onComplete, setOpen }: { match: MatchData, onCom
                     ))}
                     <button
                         onClick={() => handleAction("wicket")}
-                        disabled={!!activePrompt}
+                        disabled={!!activePrompt || match.status === "completed"}
                         className="h-16 rounded-[1.5rem] bg-red-50 border border-red-100 shadow-sm text-xl font-black text-red-600 hover:bg-red-100 active:scale-95 transition-all disabled:opacity-50"
                     >
                         W
                     </button>
                     <div className="grid grid-cols-2 gap-2">
-                        <button onClick={() => handleAction("extra", 0)} disabled={!!activePrompt} className="rounded-2xl bg-amber-50 text-[10px] font-black text-amber-600 border border-amber-100 active:scale-90 transition-all uppercase">WD</button>
-                        <button onClick={() => handleAction("extra", 1)} disabled={!!activePrompt} className="rounded-2xl bg-amber-50 text-[10px] font-black text-amber-600 border border-amber-100 active:scale-90 transition-all uppercase">NB</button>
+                        <button onClick={() => handleAction("extra", 0)} disabled={!!activePrompt || match.status === "completed"} className="rounded-2xl bg-amber-50 text-[10px] font-black text-amber-600 border border-amber-100 active:scale-90 transition-all uppercase">WD</button>
+                        <button onClick={() => handleAction("extra", 1)} disabled={!!activePrompt || match.status === "completed"} className="rounded-2xl bg-amber-50 text-[10px] font-black text-amber-600 border border-amber-100 active:scale-90 transition-all uppercase">NB</button>
                     </div>
                 </div>
 

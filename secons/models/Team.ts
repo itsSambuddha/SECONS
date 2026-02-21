@@ -10,6 +10,7 @@ export interface ITeamPointEntry {
     position: number;
     awardedAt: Date;
     awardedBy: string;
+    reason?: string;
 }
 
 export interface ITeam extends Document {
@@ -28,6 +29,7 @@ const teamPointEntrySchema = new Schema<ITeamPointEntry>(
         position: { type: Number, required: true },
         awardedAt: { type: Date, default: Date.now },
         awardedBy: { type: String, required: true },
+        reason: { type: String },
     },
     { _id: false }
 );

@@ -3,6 +3,8 @@ import { connectDB } from "@/lib/db";
 import Match from "@/models/Match";
 import User from "@/models/User";
 import Notification from "@/models/Notification";
+import Team from "@/models/Team";
+import Fixture from "@/models/Fixture";
 import { withAuth } from "@/lib/withAuth";
 
 /**
@@ -21,8 +23,21 @@ export const PATCH = withAuth(async (req, { params, user }) => {
             return NextResponse.json({ success: false, error: "Match not found" }, { status: 404 });
         }
 
+        // Lock completed matches: Block score/status updates if already completed
+        const isScoreUpdate = body.scoreTeam1 !== undefined || body.scoreTeam2 !== undefined || body.cricketData !== undefined;
+        if (currentMatch.status === "completed" && isScoreUpdate) {
+            return NextResponse.json({
+                success: false,
+                error: "Match is finalized. Scores cannot be modified."
+            }, { status: 400 });
+        }
+
         // Prepare update object
         const updateData: any = { ...body };
+        // BSON Sanitization: convert empty string to null to prevent CastError
+        if (body.winner === "" || body.winner === "draw") {
+            updateData.winner = null;
+        }
 
         // Add to audit trail if scores changed
         if (body.scoreTeam1 !== undefined || body.scoreTeam2 !== undefined) {
@@ -35,6 +50,56 @@ export const PATCH = withAuth(async (req, { params, user }) => {
                     enteredAt: new Date()
                 }
             };
+        }
+
+        // Automated Scoring Logic: Award points on completion
+        if (body.status === "completed" && !currentMatch.pointsAwarded) {
+            let eventId = currentMatch.sportEventId;
+
+            if (!eventId) {
+                const fixture = await Fixture.findById(currentMatch.fixtureId);
+                eventId = fixture?.sportEventId;
+            }
+
+            if (eventId) {
+                const s1 = body.scoreTeam1 ?? currentMatch.scoreTeam1;
+                const s2 = body.scoreTeam2 ?? currentMatch.scoreTeam2;
+
+                let winnerId = body.winner;
+                if (!winnerId) {
+                    winnerId = s1 > s2 ? currentMatch.team1Id : s1 < s2 ? currentMatch.team2Id : "draw";
+                }
+
+                const pointEntries = [];
+                if (winnerId && winnerId !== "draw") {
+                    // Win: 1 point (User requested 1 point for every win)
+                    pointEntries.push({
+                        teamId: winnerId,
+                        points: 1,
+                        position: 1
+                    });
+                } else if (winnerId === "draw") {
+                    // Draw: 0 points (as per user's "1 point for a win" instruction)
+                    // We can still record the entry but with 0 points if needed for history
+                }
+
+                for (const entry of pointEntries) {
+                    await Team.findByIdAndUpdate(entry.teamId, {
+                        $inc: { totalPoints: entry.points },
+                        $push: {
+                            eventPoints: {
+                                eventId,
+                                points: entry.points,
+                                position: entry.position,
+                                awardedAt: new Date(),
+                                awardedBy: user.uid,
+                                reason: `Won Sports Match (${currentMatch.sportName})`
+                            }
+                        }
+                    });
+                }
+                updateData.pointsAwarded = true;
+            }
         }
 
         const updatedMatch = await Match.findByIdAndUpdate(

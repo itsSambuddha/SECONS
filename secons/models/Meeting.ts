@@ -9,6 +9,7 @@ export interface IMeeting extends Document {
     agenda?: string;
     scheduledAt: Date;
     location: string;
+    meetingLink?: string;
     attendeeGroups: string[];
     attendeeIds: string[];
     notificationSent: boolean;
@@ -23,6 +24,7 @@ const meetingSchema = new Schema<IMeeting>(
         agenda: { type: String },
         scheduledAt: { type: Date, required: true, index: true },
         location: { type: String, required: true },
+        meetingLink: { type: String },
         attendeeGroups: { type: [String], required: true },
         attendeeIds: { type: [String], default: [] },
         notificationSent: { type: Boolean, default: false },

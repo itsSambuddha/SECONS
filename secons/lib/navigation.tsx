@@ -1,3 +1,4 @@
+import Meeting from "@/models/Meeting";
 import {
     LayoutDashboard,
     CalendarDays,
@@ -11,7 +12,8 @@ import {
     Music,
     Users,
     Settings,
-    FileText
+    FileText,
+    Video
 } from "lucide-react";
 
 export interface NavItem {
@@ -63,6 +65,11 @@ export const mainNav: NavItem[] = [
         href: "/calendar",
         icon: Calendar,
     },
+    {
+        label: "Meetings",
+        href: "/meetings",
+        icon: Video,
+    }
 ];
 
 export const bottomNav: NavItem[] = [

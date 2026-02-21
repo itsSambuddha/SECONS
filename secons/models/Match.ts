@@ -33,6 +33,7 @@ export interface ICricketData {
 
 export interface IMatch extends Document {
     fixtureId: mongoose.Types.ObjectId;
+    sportEventId?: mongoose.Types.ObjectId;
     team1Id: mongoose.Types.ObjectId;
     team2Id: mongoose.Types.ObjectId;
     scoreTeam1: number;
@@ -53,6 +54,7 @@ export interface IMatch extends Document {
     enteredBy?: string;
     cricketData?: ICricketData;
     auditTrail: IScoreAuditEntry[];
+    pointsAwarded?: boolean;
     updatedAt: Date;
 }
 
@@ -70,6 +72,7 @@ const scoreAuditSchema = new Schema<IScoreAuditEntry>(
 const matchSchema = new Schema<IMatch>(
     {
         fixtureId: { type: Schema.Types.ObjectId, ref: "Fixture", index: true },
+        sportEventId: { type: Schema.Types.ObjectId, ref: "Event", index: true },
         team1Id: { type: Schema.Types.ObjectId, ref: "Team", required: true },
         team2Id: { type: Schema.Types.ObjectId, ref: "Team", required: true },
         scoreTeam1: { type: Number, default: 0 },
@@ -138,6 +141,7 @@ const matchSchema = new Schema<IMatch>(
             }
         },
         auditTrail: { type: [scoreAuditSchema], default: [] },
+        pointsAwarded: { type: Boolean, default: false },
     },
     {
         timestamps: { createdAt: false, updatedAt: true },

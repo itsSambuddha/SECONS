@@ -128,7 +128,7 @@ export async function POST(req: NextRequest) {
 
         const announcement = await Announcement.create({
             title,
-            content,
+            body: content,
             targetRoles: finalTargetRoles,
             targetDomains: finalTargetDomains,
             pinned: currentUser.role === "ga" ? pinned : false, // Only GA can pin
