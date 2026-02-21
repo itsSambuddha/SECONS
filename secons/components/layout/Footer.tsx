@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Instagram, Mail, MapPin, Code, MessageSquare, ChevronRight } from "lucide-react";
+import { Instagram, Mail, MapPin, Code, MessageSquare, ChevronRight, Book, Music, Trophy, Zap, Globe } from "lucide-react";
 
 export default function Footer() {
     const currentYear = new Date().getFullYear();
@@ -31,43 +31,71 @@ export default function Footer() {
                         </p>
 
                         <div className="flex items-center gap-4">
-                            <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="size-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-primary hover:border-primary transition-all group">
+                            <a href="https://instagram.com/st.edmundscollegeshillong" target="_blank" rel="noopener noreferrer" className="size-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-primary hover:border-primary transition-all group">
                                 <Instagram className="size-4 text-slate-400 group-hover:text-white" />
                             </a>
-                            <a href="mailto:support@secons.org" className="size-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-primary hover:border-primary transition-all group">
-                                <Mail className="size-4 text-slate-400 group-hover:text-white" />
+                            <a href="https://sec.edu.in" target="_blank" rel="noopener noreferrer" className="size-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-primary hover:border-primary transition-all group">
+                                <Globe className="size-4 text-slate-400 group-hover:text-white" />
                             </a>
                         </div>
                     </div>
 
-                    {/* Product Links */}
+                    {/* The Arena - Domain Grid */}
                     <div className="space-y-8">
-                        <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500">Product</h3>
-                        <ul className="space-y-4">
-                            {["Features", "Archives & Inventory", "Pricing"].map((item) => (
-                                <li key={item}>
-                                    <Link href={`/${item.toLowerCase().replace(/ /g, "-")}`} className="text-slate-400 hover:text-white text-sm font-medium transition-colors flex items-center group">
-                                        <ChevronRight className="size-3 opacity-0 -ml-4 group-hover:opacity-100 group-hover:ml-0 transition-all text-primary" />
-                                        {item}
-                                    </Link>
-                                </li>
-                            ))}
+                        <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500">The Arena</h3>
+                        <ul className="space-y-5">
+                            <li>
+                                <Link href="/all-events?category=sports" className="flex items-center gap-4 group">
+                                    <div className="size-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center group-hover:text-primary transition-colors">
+                                        <Trophy className="size-4" />
+                                    </div>
+                                    <span className="text-sm font-bold text-slate-400 group-hover:text-white transition-colors uppercase tracking-tight">Sports Command</span>
+                                </Link>
+                            </li>
+                            <li>
+                                <Link href="/all-events?category=cultural" className="flex items-center gap-4 group">
+                                    <div className="size-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center group-hover:text-primary transition-colors">
+                                        <Music className="size-4" />
+                                    </div>
+                                    <span className="text-sm font-bold text-slate-400 group-hover:text-white transition-colors uppercase tracking-tight">Cultural Stage</span>
+                                </Link>
+                            </li>
+                            <li>
+                                <Link href="/all-events?category=literary" className="flex items-center gap-4 group">
+                                    <div className="size-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center group-hover:text-primary transition-colors">
+                                        <Book className="size-4" />
+                                    </div>
+                                    <span className="text-sm font-bold text-slate-400 group-hover:text-white transition-colors uppercase tracking-tight">Literary Circle</span>
+                                </Link>
+                            </li>
                         </ul>
                     </div>
 
-                    {/* Secretariat Links */}
+                    {/* The Legacy - Festival Stats */}
                     <div className="space-y-8">
-                        <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500">Secretariat</h3>
-                        <ul className="space-y-4">
-                            {["Control Room", "Alumni Handover", "Support Desk"].map((item) => (
-                                <li key={item}>
-                                    <Link href={`/${item.toLowerCase().replace(/ /g, "-")}`} className="text-slate-400 hover:text-white text-sm font-medium transition-colors flex items-center group">
-                                        <ChevronRight className="size-3 opacity-0 -ml-4 group-hover:opacity-100 group-hover:ml-0 transition-all text-primary" />
-                                        {item}
-                                    </Link>
-                                </li>
-                            ))}
-                        </ul>
+                        <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500">The Legacy</h3>
+                        <div className="grid grid-cols-1 gap-6">
+                            <div className="flex items-center gap-4">
+                                <span className="font-display font-black text-3xl text-primary italic leading-none">45+</span>
+                                <div>
+                                    <p className="text-[10px] font-black text-white uppercase tracking-widest">Events</p>
+                                    <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Live this week</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <span className="font-display font-black text-3xl text-white italic leading-none">15+</span>
+                                <div>
+                                    <p className="text-[10px] font-black text-white uppercase tracking-widest">Departments</p>
+                                    <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">In Competition</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20">
+                                    <Zap className="size-3 text-primary animate-pulse" />
+                                    <span className="text-[10px] font-black text-primary uppercase tracking-widest">Live Telemetry active</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Contact Details */}
@@ -86,26 +114,37 @@ export default function Footer() {
                                 </a>
                             </li>
                             <li>
-                                <div className="flex items-start gap-4">
-                                    <div className="size-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
-                                        <Mail className="size-4 text-slate-400" />
+                                <a href="mailto:sidhusamsk@gmail.com" className="flex items-start gap-4 group">
+                                    <div className="size-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-primary/20 group-hover:border-primary/50 transition-all">
+                                        <Mail className="size-4 text-primary" />
                                     </div>
                                     <div>
-                                        <p className="text-sm font-black text-white uppercase italic tracking-tight">Email Support</p>
-                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">support@secons.org</p>
+                                        <p className="text-sm font-black text-white uppercase italic tracking-tight">Dev Email Support</p>
+                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">sidhusamsk@gmail.com</p>
                                     </div>
-                                </div>
+                                </a>
                             </li>
                             <li>
-                                <div className="flex items-start gap-4">
-                                    <div className="size-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
-                                        <MapPin className="size-4 text-slate-400" />
+                                <a href="https://www.instagram.com/_.sam.here._" target="_blank" rel="noopener noreferrer" className="flex items-start gap-4 group">
+                                    <div className="size-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-primary/20 group-hover:border-primary/50 transition-all">
+                                        <Instagram className="size-4 text-primary" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-black text-white uppercase italic tracking-tight">Dev Instagram</p>
+                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">@_.sam.here._</p>
+                                    </div>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="https://www.google.com/maps/place/St.+Edmund's+College,+Shillong/@25.5675881,91.8943209,17z/data=!3m1!4b1!4m6!3m5!1s0x37507ea4cc6bcba9:0x2a59aebd4a4ac759!8m2!3d25.5675833!4d91.8968958!16zL20vMGR0cHl3?entry=ttu&g_ep=EgoyMDI2MDIxOC4wIKXMDSoASAFQAw%3D%3D" target="_blank" rel="noopener noreferrer" className="flex items-start gap-4 group">
+                                    <div className="size-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-primary/20 group-hover:border-primary/50 transition-all">
+                                        <MapPin className="size-4 text-primary" />
                                     </div>
                                     <div>
                                         <p className="text-sm font-black text-white uppercase italic tracking-tight">Address</p>
                                         <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">St. Edmund's College, Shillong, India</p>
                                     </div>
-                                </div>
+                                </a>
                             </li>
                         </ul>
                     </div>
